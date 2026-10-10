@@ -1,4 +1,4 @@
-namespace SuikodenThreeRunesPassives;
+namespace SuikodenThreeRunes.Passives;
 
 internal struct RuneSwapState
 {

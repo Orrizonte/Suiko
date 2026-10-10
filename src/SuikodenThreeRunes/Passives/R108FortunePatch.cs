@@ -1,7 +1,7 @@
 using System;
 using HarmonyLib;
 
-namespace SuikodenThreeRunesPassives;
+namespace SuikodenThreeRunes.Passives;
 
 [HarmonyPatch(typeof(BattleBase), "calc_exp")]
 internal static class R108FortunePatch
@@ -10,7 +10,7 @@ internal static class R108FortunePatch
 	[HarmonyPriority(800)]
 	private static void Prefix(out RuneSwapListState __state)
 	{
-		__state = PassiveRuneSlots.PresentHiddenRuneToAllBattleHolders(Plugin.FortuneRuneId.Value, "Fortune");
+		__state = PassiveRuneSlots.PresentHiddenRuneToAllBattleHolders(PassiveConfig.FortuneRuneId.Value, "Fortune");
 	}
 
 	[HarmonyFinalizer]

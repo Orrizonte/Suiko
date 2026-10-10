@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace SuikodenThreeRunesPassives;
+namespace SuikodenThreeRunes.Passives;
 
 internal sealed class RuneSwapListState
 {

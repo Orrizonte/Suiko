@@ -1,7 +1,7 @@
 using System;
 using HarmonyLib;
 
-namespace SuikodenThreeRunesPassives;
+namespace SuikodenThreeRunes.Passives;
 
 [HarmonyPatch(typeof(BattleBase), "check_meichu")]
 internal static class R108HazinessPatch
@@ -10,7 +10,7 @@ internal static class R108HazinessPatch
 	[HarmonyPriority(800)]
 	private static void Prefix(out RuneSwapListState __state)
 	{
-		__state = PassiveRuneSlots.PresentHiddenRuneToAllBattleHolders(Plugin.HazinessRuneId.Value, "Brume/Haziness");
+		__state = PassiveRuneSlots.PresentHiddenRuneToAllBattleHolders(PassiveConfig.HazinessRuneId.Value, "Brume/Haziness");
 	}
 
 	[HarmonyFinalizer]

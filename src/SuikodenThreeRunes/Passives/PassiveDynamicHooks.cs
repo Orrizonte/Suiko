@@ -7,7 +7,7 @@ using BepInEx.Logging;
 using HarmonyLib;
 using Il2CppInterop.Runtime.InteropTypes.Arrays;
 
-namespace SuikodenThreeRunesPassives;
+namespace SuikodenThreeRunes.Passives;
 
 internal static class PassiveDynamicHooks
 {
@@ -45,7 +45,7 @@ internal static class PassiveDynamicHooks
 		Patch(harmony, "monster_rootine", "PheroPrefix", "ListRestoreFinalizer", "Phero -> monster_rootine");
 		Patch(harmony, "make_monster_data", "PheroPrefix", "ListRestoreFinalizer", "Phero -> make_monster_data");
 		Patch(harmony, "set_player_finished", null, null, "Sunbeam fallback -> set_player_finished", "SunbeamFinishedPostfix");
-		if (Plugin.EnableExperimentalFieldPassives.Value)
+		if (PassiveConfig.EnableExperimentalFieldPassives.Value)
 		{
 			InstallFieldDiscovery(harmony);
 		}
@@ -68,7 +68,7 @@ internal static class PassiveDynamicHooks
 			MethodInfo methodInfo = AccessTools.Method(typeof(BattleBase), targetName, (Type[])null, (Type[])null);
 			if ((object)methodInfo == null)
 			{
-				ManualLogSource modLog = Plugin.ModLog;
+				ManualLogSource modLog = PassiveConfig.ModLog;
 				BepInExWarningLogInterpolatedStringHandler val = new BepInExWarningLogInterpolatedStringHandler(76, 1, out flag);
 				if (flag)
 				{
@@ -84,7 +84,7 @@ internal static class PassiveDynamicHooks
 			HarmonyMethod val4 = ((finalizerName == null) ? ((HarmonyMethod)null) : new HarmonyMethod(AccessTools.Method(typeof(PassiveDynamicHooks), finalizerName, (Type[])null, (Type[])null)));
 			harmony.Patch((MethodBase)methodInfo, val2, val3, (HarmonyMethod)null, val4, (HarmonyMethod)null);
 			Installed.Add(targetName);
-			ManualLogSource modLog2 = Plugin.ModLog;
+			ManualLogSource modLog2 = PassiveConfig.ModLog;
 			BepInExInfoLogInterpolatedStringHandler val5 = new BepInExInfoLogInterpolatedStringHandler(28, 2, out flag);
 			if (flag)
 			{
@@ -98,7 +98,7 @@ internal static class PassiveDynamicHooks
 		}
 		catch (Exception ex)
 		{
-			ManualLogSource modLog3 = Plugin.ModLog;
+			ManualLogSource modLog3 = PassiveConfig.ModLog;
 			BepInExWarningLogInterpolatedStringHandler val = new BepInExWarningLogInterpolatedStringHandler(23, 2, out flag);
 			if (flag)
 			{
@@ -132,29 +132,29 @@ internal static class PassiveDynamicHooks
 		catch
 		{
 		}
-		Plugin.ModLog.LogInfo((object)$"R158 PASSIF point natif appele : {text}({value}).");
+		PassiveConfig.ModLog.LogInfo((object)$"R158 PASSIF point natif appele : {text}({value}).");
 	}
 
 	private static void DoubleBeatPrefix(MethodBase __originalMethod, out RuneSwapListState __state)
 	{
 		LogSignatureOnce(__originalMethod);
-		__state = PassiveRuneSlots.PresentHiddenRuneToAllBattleHolders(Plugin.DoubleBeatRuneId.Value, "Double-Beat");
+		__state = PassiveRuneSlots.PresentHiddenRuneToAllBattleHolders(PassiveConfig.DoubleBeatRuneId.Value, "Double-Beat");
 	}
 
 	private static void KillerPrefix(MethodBase __originalMethod, out RuneSwapListState __state)
 	{
 		LogSignatureOnce(__originalMethod);
-		__state = PassiveRuneSlots.PresentHiddenRuneToAllBattleHolders(Plugin.KillerRuneId.Value, "Tueur/Killer");
+		__state = PassiveRuneSlots.PresentHiddenRuneToAllBattleHolders(PassiveConfig.KillerRuneId.Value, "Tueur/Killer");
 	}
 
 	private static void CounterTurtlePrefix(MethodBase __originalMethod, out CounterTurtleState __state)
 	{
 		LogSignatureOnce(__originalMethod);
 		__state = new CounterTurtleState();
-		__state.CounterSwaps = PassiveRuneSlots.PresentHiddenRuneToAllBattleHolders(Plugin.CounterRuneId.Value, "Contre/Counter");
+		__state.CounterSwaps = PassiveRuneSlots.PresentHiddenRuneToAllBattleHolders(PassiveConfig.CounterRuneId.Value, "Contre/Counter");
 		foreach (PLAYER_BASE battlePlayer in PassiveRuneSlots.GetBattlePlayers())
 		{
-			if (PassiveRuneSlots.HasHiddenRune(battlePlayer, Plugin.TurtleRuneId.Value))
+			if (PassiveRuneSlots.HasHiddenRune(battlePlayer, PassiveConfig.TurtleRuneId.Value))
 			{
 				TurtleStatusState? turtleStatusState = CaptureTurtleStatus(PassiveRuneSlots.FindBattleIndex(battlePlayer), battlePlayer);
 				if (turtleStatusState != null)
@@ -177,17 +177,17 @@ internal static class PassiveDynamicHooks
 
 	private static void SparkPrefix(out RuneSwapListState __state)
 	{
-		__state = PassiveRuneSlots.PresentHiddenRuneToAllBattleHolders(Plugin.SparkRuneId.Value, "Spark");
+		__state = PassiveRuneSlots.PresentHiddenRuneToAllBattleHolders(PassiveConfig.SparkRuneId.Value, "Spark");
 	}
 
 	private static void ProsperityPrefix(out RuneSwapListState __state)
 	{
-		__state = PassiveRuneSlots.PresentHiddenRuneToAllBattleHolders(Plugin.ProsperityRuneId.Value, "Prosperity");
+		__state = PassiveRuneSlots.PresentHiddenRuneToAllBattleHolders(PassiveConfig.ProsperityRuneId.Value, "Prosperity");
 	}
 
 	private static void PheroPrefix(out RuneSwapListState __state)
 	{
-		__state = PassiveRuneSlots.PresentHiddenRuneToAllBattleHolders(Plugin.PheroRuneId.Value, "Phero");
+		__state = PassiveRuneSlots.PresentHiddenRuneToAllBattleHolders(PassiveConfig.PheroRuneId.Value, "Phero");
 	}
 
 	private static Exception? SingleRestoreFinalizer(Exception? __exception, RuneSwapState __state)
@@ -208,7 +208,7 @@ internal static class PassiveDynamicHooks
 		{
 			LogSignatureOnce(__originalMethod);
 			int battleIndex = __0;
-			if (!PassiveRuneSlots.TryGetBattlePlayer(battleIndex, out PLAYER_BASE player) || player == null || !PassiveRuneSlots.HasHiddenRune(player, Plugin.SunbeamRuneId.Value))
+			if (!PassiveRuneSlots.TryGetBattlePlayer(battleIndex, out PLAYER_BASE player) || player == null || !PassiveRuneSlots.HasHiddenRune(player, PassiveConfig.SunbeamRuneId.Value))
 			{
 				return;
 			}
@@ -224,13 +224,13 @@ internal static class PassiveDynamicHooks
 				int num = Math.Min(value2, value + 5);
 				if (num != value && TryWriteInt(obj, "hp", num))
 				{
-					LogDirectOnce(player, Plugin.SunbeamRuneId.Value, "Sunbeam combat +5 HP");
+					LogDirectOnce(player, PassiveConfig.SunbeamRuneId.Value, "Sunbeam combat +5 HP");
 				}
 			}
 		}
 		catch (Exception ex)
 		{
-			Plugin.ModLog.LogWarning((object)("R108 Sunbeam combat ignoree pour ce tour : " + ex.Message));
+			PassiveConfig.ModLog.LogWarning((object)("R108 Sunbeam combat ignoree pour ce tour : " + ex.Message));
 		}
 	}
 
@@ -281,7 +281,7 @@ internal static class PassiveDynamicHooks
 			}
 			if (turtleStatusState.Values.Count > 0)
 			{
-				LogDirectOnce(player, Plugin.TurtleRuneId.Value, "Turtle protection etats (" + string.Join(",", turtleStatusState.Values.Select<(MemberInfo, object), string>(((MemberInfo Member, object Value) v) => v.Member.Name).Distinct()) + ")");
+				LogDirectOnce(player, PassiveConfig.TurtleRuneId.Value, "Turtle protection etats (" + string.Join(",", turtleStatusState.Values.Select<(MemberInfo, object), string>(((MemberInfo Member, object Value) v) => v.Member.Name).Distinct()) + ")");
 			}
 			return turtleStatusState;
 		}
@@ -335,14 +335,14 @@ internal static class PassiveDynamicHooks
 	{
 		//IL_0078: Unknown result type (might be due to invalid IL or missing references)
 		//IL_007e: Expected O, but got Unknown
-		if (!Plugin.LogFirstActivation.Value)
+		if (!PassiveConfig.LogFirstActivation.Value)
 		{
 			return;
 		}
 		string item = $"direct:{p.chara_no}:{runeId}:{effect}";
 		if (DirectLogged.Add(item))
 		{
-			ManualLogSource modLog = Plugin.ModLog;
+			ManualLogSource modLog = PassiveConfig.ModLog;
 			bool flag = default(bool);
 			BepInExInfoLogInterpolatedStringHandler val = new BepInExInfoLogInterpolatedStringHandler(88, 3, out flag);
 			if (flag)
@@ -432,16 +432,16 @@ internal static class PassiveDynamicHooks
 			}
 			if (list.Count > 0)
 			{
-				Plugin.ModLog.LogInfo((object)("R108 terrain : candidats detectes (diagnostic, non patches aveuglement) : " + string.Join(" | ", list.Take(20))));
+				PassiveConfig.ModLog.LogInfo((object)("R108 terrain : candidats detectes (diagnostic, non patches aveuglement) : " + string.Join(" | ", list.Take(20))));
 			}
 			else
 			{
-				Plugin.ModLog.LogInfo((object)"R108 terrain : aucun point nomme dash/encount/step expose dans GSD1; Holy/True Holy/Champion/Sunbeam-marche restent a valider separement.");
+				PassiveConfig.ModLog.LogInfo((object)"R108 terrain : aucun point nomme dash/encount/step expose dans GSD1; Holy/True Holy/Champion/Sunbeam-marche restent a valider separement.");
 			}
 		}
 		catch (Exception ex)
 		{
-			Plugin.ModLog.LogWarning((object)("R108 terrain : inspection impossible : " + ex.Message));
+			PassiveConfig.ModLog.LogWarning((object)("R108 terrain : inspection impossible : " + ex.Message));
 		}
 	}
 

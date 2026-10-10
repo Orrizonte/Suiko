@@ -7,24 +7,19 @@ using BepInEx.Core.Logging.Interpolation;
 using BepInEx.Logging;
 using Il2CppInterop.Runtime.InteropTypes.Arrays;
 
-namespace SuikodenThreeRunesPassives;
+namespace SuikodenThreeRunes.Passives;
 
 internal static class PassiveRuneSlots
 {
 	private static readonly HashSet<string> LoggedActivations = new HashSet<string>(StringComparer.Ordinal);
 
-	internal static void RefreshThresholdsFromMainPlugin()
-	{
-		Plugin.ModLog.LogInfo((object)$"R157 : etat des 3 runes lu directement dans le mod principal (seuils MAG {SuikodenThreeRunes.Plugin.SecondSlotMag.Value}/{SuikodenThreeRunes.Plugin.ThirdSlotMag.Value}).");
-	}
-
 	internal static bool HasEquippedRune(PLAYER_BASE? player, int runeId)
 	{
-		if (!Plugin.EnableAll.Value || ((player != null) ? player.monsyo_data : null) == null || runeId <= 0 || runeId >= 34)
+		if (!PassiveConfig.Active || !PassiveConfig.EnableAll.Value || ((player != null) ? player.monsyo_data : null) == null || runeId <= 0 || runeId >= 34)
 		{
 			return false;
 		}
-		return Array.IndexOf(SuikodenThreeRunes.RuneSlotService.GetUnlockedRuneIds(player), (byte)runeId) >= 0;
+		return Array.IndexOf(RuneSlotService.GetUnlockedRuneIds(player), (byte)runeId) >= 0;
 	}
 
 	internal static bool HasHiddenRune(PLAYER_BASE? player, int runeId)
@@ -42,7 +37,7 @@ internal static class PassiveRuneSlots
 		{
 			return Array.Empty<byte>();
 		}
-		return SuikodenThreeRunes.RuneSlotService.GetUnlockedRuneIds(player);
+		return RuneSlotService.GetUnlockedRuneIds(player);
 	}
 
 	internal static RuneSwapState PresentHiddenRuneToNative(PLAYER_BASE? player, int runeId, string effectName)
@@ -58,7 +53,7 @@ internal static class PassiveRuneSlots
 		result.OriginalLevel = monsyo_data.monsyo_level;
 		result.PresentedRuneId = runeId;
 		result.Changed = true;
-		SuikodenThreeRunes.RuneSlotService.BeginTemporaryNativeRune(player, (byte)runeId);
+		RuneSlotService.BeginTemporaryNativeRune(player, (byte)runeId);
 		monsyo_data.monsyo_id = (byte)runeId;
 		monsyo_data.monsyo_level = 0;
 		LogActivationOnce(player, runeId, effectName, result.OriginalId);
@@ -88,7 +83,7 @@ internal static class PassiveRuneSlots
 			{
 				state.Player.monsyo_data.monsyo_id = state.OriginalId;
 				state.Player.monsyo_data.monsyo_level = state.OriginalLevel;
-				SuikodenThreeRunes.RuneSlotService.EndTemporaryNativeRune(state.Player, (byte)state.PresentedRuneId);
+				RuneSlotService.EndTemporaryNativeRune(state.Player, (byte)state.PresentedRuneId);
 			}
 		}
 	}
@@ -244,7 +239,7 @@ internal static class PassiveRuneSlots
 	{
 		//IL_00a3: Unknown result type (might be due to invalid IL or missing references)
 		//IL_00a9: Expected O, but got Unknown
-		if (!Plugin.LogFirstActivation.Value)
+		if (!PassiveConfig.LogFirstActivation.Value)
 		{
 			return;
 		}
@@ -253,7 +248,7 @@ internal static class PassiveRuneSlots
 		{
 			string text = string.Join(",", from v in GetEquippedRuneIds(player)
 				select v.ToString());
-			ManualLogSource modLog = Plugin.ModLog;
+			ManualLogSource modLog = PassiveConfig.ModLog;
 			bool flag = default(bool);
 			BepInExInfoLogInterpolatedStringHandler val = new BepInExInfoLogInterpolatedStringHandler(143, 5, out flag);
 			if (flag)

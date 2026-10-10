@@ -9,7 +9,7 @@ namespace BepInEx
         [Flags] public enum DependencyFlags { HardDependency = 1, SoftDependency = 2 }
         public BepInDependency(string DependencyGUID, DependencyFlags Flags = DependencyFlags.HardDependency) { }
     }
-    public static class Paths { public static string GameRootPath => null; }
+    public static class Paths { public static string GameRootPath => null; public static string PluginPath => null; }
 }
 namespace BepInEx.Configuration
 {

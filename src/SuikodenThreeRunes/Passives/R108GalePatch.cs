@@ -1,7 +1,7 @@
 using System;
 using HarmonyLib;
 
-namespace SuikodenThreeRunesPassives;
+namespace SuikodenThreeRunes.Passives;
 
 [HarmonyPatch(typeof(BattleBase), "calc_noryoku")]
 internal static class R108GalePatch
@@ -10,7 +10,7 @@ internal static class R108GalePatch
 	[HarmonyPriority(800)]
 	private static void Prefix(PLAYER_BASE player_base, out RuneSwapState __state)
 	{
-		__state = PassiveRuneSlots.PresentHiddenRuneToNative(player_base, Plugin.GaleRuneId.Value, "Rafale/Gale");
+		__state = PassiveRuneSlots.PresentHiddenRuneToNative(player_base, PassiveConfig.GaleRuneId.Value, "Rafale/Gale");
 	}
 
 	[HarmonyFinalizer]
