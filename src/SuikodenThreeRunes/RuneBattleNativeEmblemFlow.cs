@@ -2426,6 +2426,33 @@ internal static class RuneBattleNativeEmblemFlow
 		{
 			val.SetSelectCell(slot);
 			instance.SetCursorUI((WindowType)8, slot);
+			// R170 : chaque cellule porte sa propre barre (m_cursor) activee par SetSelect(bool).
+			try
+			{
+				InvokeOptional(val, "SetSelectOneCell", slot);
+				Il2CppSystem.Collections.Generic.List<UIWindowListCell> cellList = val.cellList;
+				if (cellList != null)
+				{
+					for (int i = 0; i < cellList.Count && i < 3; i++)
+					{
+						InvokeOptional(cellList[i], "SetSelect", i == slot);
+					}
+					if (!_cellCursorLogged && cellList.Count > 0)
+					{
+						_cellCursorLogged = true;
+						object? cursor = cellList[0].GetType().GetProperty("m_cursor")?.GetValue(cellList[0]);
+						Plugin.ModLog.LogInfo((object)("R170 barre de selection : SetSelectOneCell/SetSelect appliques; barre presente dans les cellules Runes = " + (cursor != null) + "."));
+					}
+				}
+			}
+			catch (Exception ex)
+			{
+				if (!_cellCursorLogged)
+				{
+					_cellCursorLogged = true;
+					Plugin.ModLog.LogWarning((object)("R170 barre de selection impossible : " + ex.Message));
+				}
+			}
 			// R169 : la barre de selection est un objet du gestionnaire de combat indexe par type de fenetre;
 			// la fenetre Runes est de type Emblem (5) et non Magic (8).
 			try
@@ -2615,6 +2642,18 @@ internal static class RuneBattleNativeEmblemFlow
 		{
 		}
 		return string.Join(" ", new System.Collections.Generic.HashSet<string>(list));
+	}
+
+	private static bool _cellCursorLogged;
+
+	private static void InvokeOptional(object? target, string name, params object[] args)
+	{
+		if (target == null)
+		{
+			return;
+		}
+		System.Reflection.MethodInfo? method = target.GetType().GetMethod(name, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public, null, Array.ConvertAll(args, (object a) => a.GetType()), null);
+		method?.Invoke(target, args);
 	}
 
 	private static System.Reflection.PropertyInfo? _choosableProperty;
@@ -2856,6 +2895,13 @@ internal static class RuneBattleNativeEmblemFlow
 	private static void RestoreEmblemGeometry()
 	{
 		RestoreSelectionBar();
+		try
+		{
+			InvokeOptional(_geometryOwner, "ClearSelect");
+		}
+		catch
+		{
+		}
 		//IL_0011: Unknown result type (might be due to invalid IL or missing references)
 		//IL_0021: Unknown result type (might be due to invalid IL or missing references)
 		UIWindowList geometryOwner = _geometryOwner;
