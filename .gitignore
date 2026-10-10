@@ -4,3 +4,5 @@ build/
 *.user
 .vs/
 SuikodenThreeRunes-*.zip
+tools/*/bin/
+tools/*/obj/
