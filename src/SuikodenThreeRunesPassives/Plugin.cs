@@ -11,7 +11,7 @@ using HarmonyLib;
 
 namespace SuikodenThreeRunesPassives;
 
-[BepInPlugin("fr.suikodenhd.threerunes.passives", "Suikoden I - Trois runes - Passifs 3 slots", "0.4.7-r157-fix")]
+[BepInPlugin("fr.suikodenhd.threerunes.passives", "Suikoden I - Trois runes - Passifs 3 slots", "0.4.8-r158-fix")]
 [BepInDependency("fr.suikodenhd.threerunes", BepInDependency.DependencyFlags.HardDependency)]
 [BepInDependency("d3xMachina.suikoden_fix", BepInDependency.DependencyFlags.SoftDependency)]
 public sealed class Plugin : BasePlugin
@@ -20,7 +20,7 @@ public sealed class Plugin : BasePlugin
 
 	public const string Name = "Suikoden I - Trois runes - Passifs 3 slots";
 
-	public const string Version = "0.4.7-r157-fix";
+	public const string Version = "0.4.8-r158-fix";
 
 	private const string SupportedGameAssemblySha256 = "e093f175eaf3734d293ca0a236c652dd7fcc72ea5fa10d7b21103edf12f11c3a";
 
@@ -99,7 +99,7 @@ public sealed class Plugin : BasePlugin
 			{
 				((BepInExLogInterpolatedStringHandler)val).AppendFormatted<string>("Suikoden I - Trois runes - Passifs 3 slots");
 				((BepInExLogInterpolatedStringHandler)val).AppendLiteral(" ");
-				((BepInExLogInterpolatedStringHandler)val).AppendFormatted<string>("0.4.7-r157-fix");
+				((BepInExLogInterpolatedStringHandler)val).AppendFormatted<string>("0.4.8-r158-fix");
 				((BepInExLogInterpolatedStringHandler)val).AppendLiteral(" charge.");
 			}
 			modLog.LogInfo(val);

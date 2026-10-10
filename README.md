@@ -34,6 +34,12 @@ Le mod vérifie l'empreinte SHA-256 de `GameAssembly.dll`. Après une mise à jo
 - **Menu principal › Runes** : ←/→ change l'emplacement actif.
 - **Combat › Runes** : la fenêtre affiche les 3 emplacements ; A valide la rune et ouvre ses sorts, B revient aux commandes.
 
+## Changements de la version 0.9.8-r158 (d'après le log du 1er test)
+
+- **4e sort inaccessible** : le sélecteur laissait `magic_kazu` (nombre de sorts) à 3 en ouvrant la liste des sorts ; le curseur revenait en haut après le 3e. Il reçoit maintenant le vrai nombre de sorts.
+- **Runes qui se superposent** : la fenêtre Runes reprenait la largeur mémorisée sur un autre personnage (ex. 379 au lieu de 452 pour « Rune de pie-grièche »), et le texte débordait. Seule la hauteur est maintenant modifiée.
+- **Passifs** : Double-Beat, Tueur, Contre, Tortue et Brume ne se déclenchaient jamais (aucune ligne `PASSIF` dans le log). La rune secondaire est maintenant présentée à tous ses porteurs pendant l'appel natif, puis la rune active est restaurée. Chaque activation est écrite une fois dans le log (`R108 PASSIF 3-SLOTS`).
+
 ## Changements de la version 0.9.7-r157 (correctifs)
 
 **Stockage (runes perdues ou dupliquées, passifs inactifs, boutique)**

@@ -2091,6 +2091,13 @@ internal static class RuneBattleNativeEmblemFlow
 			window_work.selected_item = 0;
 			window_work.selected_monster = 0;
 			window_work.return_value = 0;
+			// R158 : le selecteur avait force magic_kazu=3 (3 emplacements). make_magic_window renvoie le
+			// nombre de sorts sans mettre a jour magic_kazu : sans cette ligne le curseur bouclait apres le
+			// 3e sort et le 4e sort etait inaccessible.
+			if (!_directNativeRune && num4 > 0)
+			{
+				window_work.magic_kazu = num4;
+			}
 			if (_directNativeRune)
 			{
 				window_work.magic_kazu = 1;
@@ -2453,8 +2460,10 @@ internal static class RuneBattleNativeEmblemFlow
 		}
 		float num2 = ((emblem.m_contentsLayout != null) ? ((HorizontalOrVerticalLayoutGroup)emblem.m_contentsLayout).spacing : ((emblem.m_layout != null) ? ((HorizontalOrVerticalLayoutGroup)emblem.m_layout).spacing : 0f));
 		_expandedHeightDelta = Math.Max(0f, 2f * (num + num2));
-		emblem.m_rectTransform.sizeDelta = new Vector2(_originalWindowSize.x, _originalWindowSize.y + _expandedHeightDelta);
-		emblem.m_contents.sizeDelta = new Vector2(_originalContentsSize.x, _originalContentsSize.y + _expandedHeightDelta);
+		// R158 : la largeur reste celle calculee par le jeu pour le personnage courant (longueur des noms).
+		// Reprendre la largeur memorisee sur un autre personnage faisait deborder/superposer le texte.
+		emblem.m_rectTransform.sizeDelta = new Vector2(emblem.m_rectTransform.sizeDelta.x, _originalWindowSize.y + _expandedHeightDelta);
+		emblem.m_contents.sizeDelta = new Vector2(emblem.m_contents.sizeDelta.x, _originalContentsSize.y + _expandedHeightDelta);
 		emblem.m_unFocusedHeight = _originalUnfocusedHeight + _expandedHeightDelta;
 		LayoutRebuilder.ForceRebuildLayoutImmediate(emblem.m_contents);
 		Canvas.ForceUpdateCanvases();
@@ -2471,8 +2480,8 @@ internal static class RuneBattleNativeEmblemFlow
 		}
 		try
 		{
-			geometryOwner.m_rectTransform.sizeDelta = _originalWindowSize;
-			geometryOwner.m_contents.sizeDelta = _originalContentsSize;
+			geometryOwner.m_rectTransform.sizeDelta = new Vector2(geometryOwner.m_rectTransform.sizeDelta.x, _originalWindowSize.y);
+			geometryOwner.m_contents.sizeDelta = new Vector2(geometryOwner.m_contents.sizeDelta.x, _originalContentsSize.y);
 			geometryOwner.m_unFocusedHeight = _originalUnfocusedHeight;
 		}
 		catch
