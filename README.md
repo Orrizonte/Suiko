@@ -37,6 +37,10 @@ Le mod vérifie l'empreinte SHA-256 de `GameAssembly.dll`. Après une mise à jo
 - **Menu principal › Runes** : ←/→ change l'emplacement actif.
 - **Combat › Runes** : la fenêtre affiche les 3 emplacements ; A valide la rune et ouvre ses sorts, B revient aux commandes.
 
+## Changements de la version 0.9.24-r173
+
+- **B depuis la liste des sorts ramène au menu de commandes**, par l'annulation native, comme B dans la fenêtre Runes. Le A automatique de la 0.9.23 est retiré. En rouvrant « Runes », le jeu affiche le sélecteur par son propre chemin, identique à la première fois. Ligne de log `R173`.
+
 ## Changements de la version 0.9.23-r172
 
 - **Retour par B identique à la première ouverture** : le mod ne reconstruit plus le sélecteur à la main après un B depuis la liste des sorts. Il passe par le chemin natif :

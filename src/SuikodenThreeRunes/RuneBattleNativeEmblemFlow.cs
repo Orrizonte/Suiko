@@ -199,63 +199,6 @@ internal static class RuneBattleNativeEmblemFlow
 		}
 	}
 
-	private static bool _autoReenterPending;
-
-	private static int _autoReenterPlayer = -1;
-
-	private static int _autoReenterStartFrame = -1000;
-
-	private static int _autoReenterInjectFrame = -1000;
-
-	// R172 : A injecte une seule fois, quand le menu de commandes est revenu avec le curseur sur "Runes".
-	private static bool TryAutoReenterDecide()
-	{
-		int frameCount = Time.frameCount;
-		if (frameCount == _autoReenterInjectFrame)
-		{
-			return true;
-		}
-		if (!_autoReenterPending)
-		{
-			return false;
-		}
-		if (frameCount - _autoReenterStartFrame > 300)
-		{
-			_autoReenterPending = false;
-			Plugin.ModLog.LogWarning((object)"R172 reouverture automatique de Runes abandonnee (menu de commandes non retrouve).");
-			return false;
-		}
-		if (_stage != CombatStage.Idle || _selectorBackReleaseGuard || _nativeRuneCancelPending || frameCount - _autoReenterStartFrame < 2)
-		{
-			return false;
-		}
-		try
-		{
-			BattleBase.WINDOW_WORK window_work = BattleBase.window_work;
-			UIBattleManager instance = Singleton<UIBattleManager>.Instance;
-			UIWindowList? command = instance?.battleWindow?.m_command;
-			if (window_work == null || instance == null || command == null || window_work.index_level != 0 || window_work.window_index != 2 || !instance.IsOpenWindowUI((WindowType)1) || ((UIWindowBasis)command).IsOpening)
-			{
-				return false;
-			}
-			if (_autoReenterPlayer >= 0 && _playerNo >= 0 && _autoReenterPlayer != _playerNo)
-			{
-				_autoReenterPending = false;
-				return false;
-			}
-			_autoReenterPending = false;
-			_autoReenterInjectFrame = frameCount;
-			CaptureNativeCommandStateBeforeRuneIfApplicable();
-			Plugin.ModLog.LogInfo((object)$"R172 A automatique sur Runes (frame {frameCount}).");
-			return true;
-		}
-		catch
-		{
-			_autoReenterPending = false;
-			return false;
-		}
-	}
-
 	private static bool IsPassiveRune(byte runeId)
 	{
 		return PassiveRuneIds.Contains(runeId);
@@ -663,11 +606,6 @@ internal static class RuneBattleNativeEmblemFlow
 		if (_probingNativeInput)
 		{
 			return false;
-		}
-		if ((int)input == 4 && TryAutoReenterDecide())
-		{
-			value = true;
-			return true;
 		}
 		if ((int)input == 5 && _nativeRuneCancelPending && _stage == CombatStage.RuneSelector && _commandDepth > 0)
 		{
@@ -2343,14 +2281,11 @@ internal static class RuneBattleNativeEmblemFlow
 			emblem.SetSelectCell(_selectedSlot);
 			if (!directNativeRune)
 			{
-				// R172 : au lieu de reconstruire le selecteur a la main (curseur different de la 1re ouverture),
-				// le retour par B passe par le chemin natif : annulation vers les commandes, puis A automatique
-				// sur "Runes". Le selecteur s'ouvre alors exactement comme la premiere fois.
-				_autoReenterPending = true;
-				_autoReenterPlayer = _playerNo;
-				_autoReenterStartFrame = Time.frameCount;
+				// R173 : B depuis la liste des sorts revient au menu de commandes par l'annulation native (comme B
+				// dans le selecteur). Aucune reconstruction manuelle ni touche simulee : la prochaine ouverture de
+				// Runes se fait par le chemin du jeu, identique a la premiere fois.
 				ArmNativeRuneSelectorCancel();
-				Plugin.ModLog.LogInfo((object)"R172 retour B : annulation native vers les commandes puis reouverture automatique de Runes (meme chemin que la 1re ouverture).");
+				Plugin.ModLog.LogInfo((object)"R173 retour B : retour au menu de commandes (annulation native).");
 				return;
 			}
 			instance.OpenWindowUI((WindowType)8, true);
