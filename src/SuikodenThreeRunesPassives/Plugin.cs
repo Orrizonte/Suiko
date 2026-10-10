@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Reflection;
 using System.Security.Cryptography;
 using BepInEx;
 using BepInEx.Configuration;
@@ -10,7 +11,7 @@ using HarmonyLib;
 
 namespace SuikodenThreeRunesPassives;
 
-[BepInPlugin("fr.suikodenhd.threerunes.passives", "Suikoden I - Trois runes - Passifs 3 slots", "0.4.6-r156-passive-router")]
+[BepInPlugin("fr.suikodenhd.threerunes.passives", "Suikoden I - Trois runes - Passifs 3 slots", "0.4.7-r157-fix")]
 [BepInDependency("fr.suikodenhd.threerunes", BepInDependency.DependencyFlags.HardDependency)]
 [BepInDependency("d3xMachina.suikoden_fix", BepInDependency.DependencyFlags.SoftDependency)]
 public sealed class Plugin : BasePlugin
@@ -19,7 +20,7 @@ public sealed class Plugin : BasePlugin
 
 	public const string Name = "Suikoden I - Trois runes - Passifs 3 slots";
 
-	public const string Version = "0.4.6-r156-passive-router";
+	public const string Version = "0.4.7-r157-fix";
 
 	private const string SupportedGameAssemblySha256 = "e093f175eaf3734d293ca0a236c652dd7fcc72ea5fa10d7b21103edf12f11c3a";
 
@@ -89,7 +90,7 @@ public sealed class Plugin : BasePlugin
 			TrueHolyRuneId = ((BasePlugin)this).Config.Bind<int>("IDs", "Rune_True_Holy", 33, "ID natif True Holy/High-Speed.");
 			PassiveRuneSlots.RefreshThresholdsFromMainPlugin();
 			_harmony = new Harmony("fr.suikodenhd.threerunes.passives");
-			_harmony.PatchAll(typeof(Plugin).Assembly);
+			SafePatchAll(_harmony, ModLog);
 			PassiveDynamicHooks.Install(_harmony);
 			ManualLogSource modLog = ModLog;
 			bool flag = default(bool);
@@ -98,7 +99,7 @@ public sealed class Plugin : BasePlugin
 			{
 				((BepInExLogInterpolatedStringHandler)val).AppendFormatted<string>("Suikoden I - Trois runes - Passifs 3 slots");
 				((BepInExLogInterpolatedStringHandler)val).AppendLiteral(" ");
-				((BepInExLogInterpolatedStringHandler)val).AppendFormatted<string>("0.4.6-r156-passive-router");
+				((BepInExLogInterpolatedStringHandler)val).AppendFormatted<string>("0.4.7-r157-fix");
 				((BepInExLogInterpolatedStringHandler)val).AppendLiteral(" charge.");
 			}
 			modLog.LogInfo(val);
@@ -106,6 +107,38 @@ public sealed class Plugin : BasePlugin
 			ModLog.LogInfo((object)"R108 : les passifs sont lus dans TOUS les slots debloques; le slot selectionne ne sert plus a determiner si un passif existe.");
 			ModLog.LogInfo((object)"R108 : routeurs natifs installes pour Double-Beat, Killer, Counter, Spark, Brume, Rafale, Fortune, Prosperity; Sunbeam combat est complete par un fallback sans doubler l'effet natif.");
 		}
+	}
+
+	// Applique chaque classe de patch separement : un point natif introuvable ne desactive plus tout le mod.
+	internal static int SafePatchAll(Harmony harmony, ManualLogSource log)
+	{
+		int num = 0;
+		Type[] types;
+		try
+		{
+			types = typeof(Plugin).Assembly.GetTypes();
+		}
+		catch (ReflectionTypeLoadException ex)
+		{
+			types = Array.FindAll(ex.Types, (Type? t) => t != null)!;
+		}
+		foreach (Type type in types)
+		{
+			if (type.GetCustomAttributes(typeof(HarmonyPatch), inherit: true).Length == 0)
+			{
+				continue;
+			}
+			try
+			{
+				harmony.CreateClassProcessor(type).Patch();
+				num++;
+			}
+			catch (Exception ex2)
+			{
+				log.LogError((object)("Patch " + type.Name + " non applique (fonction concernee desactivee) : " + ex2.GetBaseException().Message));
+			}
+		}
+		return num;
 	}
 
 	private static bool IsSupportedGameBuild()

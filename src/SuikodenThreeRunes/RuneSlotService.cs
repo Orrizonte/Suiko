@@ -1,12 +1,23 @@
 using System;
 using System.Collections.Generic;
-using BepInEx.Core.Logging.Interpolation;
 using BepInEx.Logging;
 using Il2CppInterop.Runtime.InteropTypes.Arrays;
 
 namespace SuikodenThreeRunes;
 
-internal static class RuneSlotService
+// Stockage des trois emplacements de rune.
+//
+// Source de verite : le dictionnaire States (par chara_no).
+// En memoire de jeu, PLAYER_MONSYO contient uniquement la rune ACTIVE (monsyo_id/monsyo_level),
+// exactement comme en vanilla : monsyo_exp n'est plus jamais detourne pendant le jeu.
+// Le format compact (bit 0x8000 de monsyo_exp) n'est ecrit que le temps de la copie vers la
+// sauvegarde (BeforeSavePatch) puis relu au chargement (AfterLoadPatch). Les sauvegardes
+// existantes restent donc compatibles.
+//
+// Avant ce changement, monsyo_exp contenait l'etat compact en permanence. Le moteur natif lit ce
+// champ (boutique "Retirer", Pie-grieche...), ce qui obligeait a le remettre a 0 a certains moments;
+// l'etat compact disparaissait alors de la memoire et l'addon des passifs ne voyait plus les slots 2/3.
+public static class RuneSlotService
 {
 	private const int RuneRadix = 34;
 
@@ -33,6 +44,16 @@ internal static class RuneSlotService
 	private const int RuneShopHelpWindowIndex = 6;
 
 	private static readonly Dictionary<int, RuneState> States = new Dictionary<int, RuneState>();
+
+	// Runes presentees temporairement au moteur natif (selecteur Pie-grieche, passifs secondaires).
+	// Tant qu'une presentation est active, monsyo_id ne doit pas etre pris pour un changement d'equipement.
+	private static readonly Dictionary<int, List<byte>> TemporaryNativeRunes = new Dictionary<int, List<byte>>();
+
+	// Vrai pendant CopySaveDataToGameWork : la memoire est en cours de remplacement, rien ne doit etre
+	// mis en cache ni ecrit avant que PrepareGame relise l'etat compact.
+	private static bool _loading;
+
+	private static readonly HashSet<string> LoggedEvents = new HashSet<string>(StringComparer.Ordinal);
 
 	private static bool IsNativeFixedRune(int charaNo, byte runeId)
 	{
@@ -126,6 +147,7 @@ internal static class RuneSlotService
 		return false;
 	}
 
+
 	private static byte GetNativeRuneLevel(PLAYER_BASE player, RuneState state, byte activeRune)
 	{
 		switch (activeRune)
@@ -143,19 +165,21 @@ internal static class RuneSlotService
 		}
 	}
 
-	private static void NormalizeNativeRuneLevel(PLAYER_BASE player, RuneState state)
-	{
-		PLAYER_MONSYO monsyo_data = player.monsyo_data;
-		if (monsyo_data != null)
-		{
-			byte activeRune = ValidateRuneId(state.RuneIds[state.ActiveIndex]);
-			monsyo_data.monsyo_level = GetNativeRuneLevel(player, state, activeRune);
-		}
-	}
-
 	internal static void Reset()
 	{
 		States.Clear();
+		TemporaryNativeRunes.Clear();
+	}
+
+	internal static void BeginLoad()
+	{
+		Reset();
+		_loading = true;
+	}
+
+	internal static void EndLoad()
+	{
+		_loading = false;
 	}
 
 	internal static bool TryGetSelectedPlayer(out PLAYER_BASE? player, out string context)
@@ -163,40 +187,14 @@ internal static class RuneSlotService
 		return TryGetSelectedPlayer(int.MinValue, out player, out context);
 	}
 
+	// Ordre : boutique -> menu Runes -> combat.
+	// Les zones de travail du combat (BattleBase.window_work/battle_work) sont statiques et peuvent
+	// rester non nulles apres le premier combat : les tester en premier rendait la boutique et le menu
+	// principal inactifs pour le reste de la session.
 	internal static bool TryGetSelectedPlayer(int lockedCharaNo, out PLAYER_BASE? player, out string context)
 	{
 		player = null;
 		context = string.Empty;
-		try
-		{
-			BattleBase.WINDOW_WORK window_work = BattleBase.window_work;
-			BATTLE_WORK battle_work = BattleBase.battle_work;
-			if (window_work != null && battle_work != null)
-			{
-				PLAYER_DATA selected_player_data = window_work.selected_player_data;
-				if (selected_player_data != null && selected_player_data.player_base != null)
-				{
-					player = selected_player_data.player_base;
-					context = "Combat";
-					return true;
-				}
-				int selected_player = window_work.selected_player;
-				Il2CppReferenceArray<P_BATTLE_DATA> p_battle_data = battle_work.p_battle_data;
-				if (p_battle_data != null && selected_player >= 0 && selected_player < ((Il2CppArrayBase<P_BATTLE_DATA>)(object)p_battle_data).Length)
-				{
-					P_BATTLE_DATA val = ((Il2CppArrayBase<P_BATTLE_DATA>)(object)p_battle_data)[selected_player];
-					if (val != null && val.player_data != null && val.player_data.player_base != null)
-					{
-						player = val.player_data.player_base;
-						context = "Combat";
-						return true;
-					}
-				}
-			}
-		}
-		catch
-		{
-		}
 		try
 		{
 			h_monsyo_c.MONSYO_WORK monsyo_work = h_monsyo_c.monsyo_work;
@@ -222,19 +220,40 @@ internal static class RuneSlotService
 		catch
 		{
 		}
+		if (RuneMainMenuUiPatch.IsRuneMenuActive)
+		{
+			try
+			{
+				G_cmd_c.COMMAND_WORK command_work = G_cmd_c.command_work;
+				if (command_work != null && command_work.selected_player_data != null && command_work.selected_player_data.player_base != null)
+				{
+					player = command_work.selected_player_data.player_base;
+					context = "Menu";
+					return true;
+				}
+				if (command_work != null && TryFromParty(command_work.player_data, command_work.selected_player, command_work.index, out player))
+				{
+					context = "Menu";
+					return true;
+				}
+			}
+			catch
+			{
+			}
+		}
 		try
 		{
-			G_cmd_c.COMMAND_WORK command_work = G_cmd_c.command_work;
-			if (command_work != null && command_work.selected_player_data != null && command_work.selected_player_data.player_base != null)
+			BattleBase.WINDOW_WORK window_work = BattleBase.window_work;
+			BATTLE_WORK battle_work = BattleBase.battle_work;
+			if (window_work != null && battle_work != null)
 			{
-				player = command_work.selected_player_data.player_base;
-				context = "Menu";
-				return true;
-			}
-			if (command_work != null && TryFromParty(command_work.player_data, command_work.selected_player, command_work.index, out player))
-			{
-				context = "Menu";
-				return true;
+				PLAYER_DATA selected_player_data = window_work.selected_player_data;
+				if (selected_player_data != null && selected_player_data.player_base != null)
+				{
+					player = selected_player_data.player_base;
+					context = "Combat";
+					return true;
+				}
 			}
 		}
 		catch
@@ -397,10 +416,10 @@ internal static class RuneSlotService
 		return true;
 	}
 
+
 	internal static RuneCycleResult Cycle(PLAYER_BASE player, int direction)
 	{
 		RuneState state = GetState(player);
-		Capture(player, state);
 		int unlockedSlotCount = GetUnlockedSlotCount(player);
 		if (unlockedSlotCount <= 1)
 		{
@@ -416,7 +435,6 @@ internal static class RuneSlotService
 	internal static RuneCycleResult SelectSlot(PLAYER_BASE player, int slot)
 	{
 		RuneState state = GetState(player);
-		Capture(player, state);
 		int unlockedSlotCount = GetUnlockedSlotCount(player);
 		if (slot < 0 || slot >= unlockedSlotCount)
 		{
@@ -432,124 +450,64 @@ internal static class RuneSlotService
 	{
 		RuneState state = GetState(player);
 		int unlockedSlotCount = GetUnlockedSlotCount(player);
-		if (slot < 0 || slot >= unlockedSlotCount)
+		if (slot >= 0 && slot < unlockedSlotCount)
 		{
-			WriteState(player, state);
-			return state;
+			state.ActiveIndex = slot;
 		}
-		state.ActiveIndex = slot;
 		WriteState(player, state);
 		return state;
 	}
 
+	// Lecture de l'equipement natif (boutique, evenements) : GetState reconcilie deja monsyo_id.
 	internal static void Capture(PLAYER_BASE player)
 	{
-		RuneState state = GetState(player);
-		Capture(player, state);
-		if (IsRuneShopSelectionWindowVisible() && player.monsyo_data != null && player.monsyo_data.monsyo_id != 1)
-		{
-			player.monsyo_data.monsyo_exp = 0;
-		}
-		else
-		{
-			WritePackedState(player, state);
-		}
+		GetState(player);
 	}
 
 	internal static void EnterRuneShopCompatibility(PLAYER_BASE player)
 	{
-		//IL_0053: Unknown result type (might be due to invalid IL or missing references)
-		//IL_005a: Expected O, but got Unknown
 		RuneState state = GetState(player);
-		Capture(player, state);
-		ApplyRuneShopCompatibilityValue(player, state);
-		PLAYER_MONSYO monsyo_data = player.monsyo_data;
-		if (monsyo_data != null)
-		{
-			byte b = ValidateRuneId(state.RuneIds[state.ActiveIndex]);
-			bool flag = b == 1 || IsNativeFixedRune(player.chara_no, b);
-			ManualLogSource modLog = Plugin.ModLog;
-			bool flag2 = default(bool);
-			BepInExInfoLogInterpolatedStringHandler val = new BepInExInfoLogInterpolatedStringHandler(61, 5, out flag2);
-			if (flag2)
-			{
-				((BepInExLogInterpolatedStringHandler)val).AppendLiteral("R107 boutique : chara=");
-				((BepInExLogInterpolatedStringHandler)val).AppendFormatted<int>(player.chara_no);
-				((BepInExLogInterpolatedStringHandler)val).AppendLiteral(", slot=");
-				((BepInExLogInterpolatedStringHandler)val).AppendFormatted<int>(state.ActiveIndex + 1);
-				((BepInExLogInterpolatedStringHandler)val).AppendLiteral(", rune=");
-				((BepInExLogInterpolatedStringHandler)val).AppendFormatted<byte>(b);
-				((BepInExLogInterpolatedStringHandler)val).AppendLiteral(", ");
-				((BepInExLogInterpolatedStringHandler)val).AppendLiteral("monsyo_level=");
-				((BepInExLogInterpolatedStringHandler)val).AppendFormatted<byte>(monsyo_data.monsyo_level);
-				((BepInExLogInterpolatedStringHandler)val).AppendLiteral(", statut=");
-				((BepInExLogInterpolatedStringHandler)val).AppendFormatted<string>(flag ? "fixe" : "amovible");
-				((BepInExLogInterpolatedStringHandler)val).AppendLiteral(".");
-			}
-			modLog.LogInfo(val);
-		}
+		WriteState(player, state);
+		byte b = state.RuneIds[state.ActiveIndex];
+		bool flag = b == 1 || IsNativeFixedRune(player.chara_no, b);
+		Plugin.ModLog.LogInfo((object)$"R107 boutique : chara={player.chara_no}, slot={state.ActiveIndex + 1}, rune={b}, monsyo_level={player.monsyo_data?.monsyo_level}, statut={(flag ? "fixe" : "amovible")}.");
 	}
 
 	internal static void CaptureForRuneShop(PLAYER_BASE player)
 	{
-		//IL_0057: Unknown result type (might be due to invalid IL or missing references)
-		//IL_005d: Expected O, but got Unknown
-		RuneState state = GetState(player);
-		byte b = state.RuneIds[state.ActiveIndex];
-		byte b2 = (byte)((player.monsyo_data != null) ? ValidateRuneId(player.monsyo_data.monsyo_id) : 0);
-		Capture(player, state);
-		if (b != 0 && b2 == 0 && state.RuneIds[state.ActiveIndex] == 0)
+		RuneState state;
+		if (!States.TryGetValue(player.chara_no, out state))
 		{
-			ManualLogSource modLog = Plugin.ModLog;
-			bool flag = default(bool);
-			BepInExInfoLogInterpolatedStringHandler val = new BepInExInfoLogInterpolatedStringHandler(77, 3, out flag);
-			if (flag)
-			{
-				((BepInExLogInterpolatedStringHandler)val).AppendLiteral("R107 boutique : retrait natif detecte pour personnage ");
-				((BepInExLogInterpolatedStringHandler)val).AppendFormatted<int>(player.chara_no);
-				((BepInExLogInterpolatedStringHandler)val).AppendLiteral(", slot ");
-				((BepInExLogInterpolatedStringHandler)val).AppendFormatted<int>(state.ActiveIndex + 1);
-				((BepInExLogInterpolatedStringHandler)val).AppendLiteral(", rune ");
-				((BepInExLogInterpolatedStringHandler)val).AppendFormatted<byte>(b);
-				((BepInExLogInterpolatedStringHandler)val).AppendLiteral(" -> vide.");
-			}
-			modLog.LogInfo(val);
+			GetState(player);
+			return;
 		}
-		ApplyRuneShopCompatibilityValue(player, state);
+		byte before = state.RuneIds[state.ActiveIndex];
+		GetState(player);
+		if (before != 0 && state.RuneIds[state.ActiveIndex] == 0)
+		{
+			Plugin.ModLog.LogInfo((object)$"R107 boutique : retrait natif detecte pour personnage {player.chara_no}, slot {state.ActiveIndex + 1}, rune {before} -> vide.");
+		}
 	}
 
 	internal static void ExitRuneShopCompatibility(PLAYER_BASE player)
 	{
 		RuneState state = GetState(player);
-		Capture(player, state);
-		WritePackedState(player, state);
-	}
-
-	private static void ApplyRuneShopCompatibilityValue(PLAYER_BASE player, RuneState state)
-	{
-		PLAYER_MONSYO monsyo_data = player.monsyo_data;
-		if (monsyo_data != null)
-		{
-			NormalizeNativeRuneLevel(player, state);
-			if (ValidateRuneId(state.RuneIds[state.ActiveIndex]) == 1)
-			{
-				WritePackedState(player, state);
-			}
-			else
-			{
-				monsyo_data.monsyo_exp = 0;
-			}
-		}
+		WriteState(player, state);
 	}
 
 	internal static RuneState GetDisplayState(PLAYER_BASE player)
 	{
 		RuneState state = GetState(player);
-		Capture(player, state);
 		WriteState(player, state);
 		return state;
 	}
 
+	internal static RuneState GetShopDisplayState(PLAYER_BASE player)
+	{
+		return GetState(player);
+	}
+
+	// Selecteur Pie-grieche : presente au moteur une autre rune magique sans changer l'emplacement actif.
 	internal static bool PresentStoredCombatSlotNativeOnly(PLAYER_BASE player, int slot, out byte runeId)
 	{
 		runeId = 0;
@@ -564,6 +522,7 @@ internal static class RuneSlotService
 		{
 			return false;
 		}
+		BeginTemporaryNativeRune(player, runeId);
 		player.monsyo_data.monsyo_id = runeId;
 		player.monsyo_data.monsyo_level = GetNativeRuneLevel(player, state, runeId);
 		return true;
@@ -587,7 +546,10 @@ internal static class RuneSlotService
 		previousExp = monsyo_data.monsyo_exp;
 		monsyo_data.monsyo_id = b;
 		monsyo_data.monsyo_level = GetNativeRuneLevel(player, state, b);
-		monsyo_data.monsyo_exp = 0;
+		if ((monsyo_data.monsyo_exp & Signature) != 0)
+		{
+			monsyo_data.monsyo_exp = 0;
+		}
 		return true;
 	}
 
@@ -609,99 +571,102 @@ internal static class RuneSlotService
 		return $"active={state.ActiveIndex + 1} ids={state.RuneIds[0]}/{state.RuneIds[1]}/{state.RuneIds[2]}";
 	}
 
-	internal static RuneState GetShopDisplayState(PLAYER_BASE player)
+	// ---- API utilisee par l'addon SuikodenThreeRunesPassives ----
+
+	// Runes equipees dans les emplacements debloques (lecture seule, aucune ecriture en memoire de jeu).
+	public static byte[] GetUnlockedRuneIds(PLAYER_BASE player)
 	{
+		if (((player != null) ? player.monsyo_data : null) == null)
+		{
+			return Array.Empty<byte>();
+		}
 		RuneState state = GetState(player);
-		Capture(player, state);
-		return state;
+		int num = Math.Min(GetUnlockedSlotCount(player), 3);
+		byte[] array = new byte[num];
+		Array.Copy(state.RuneIds, array, num);
+		return array;
 	}
 
-	private static void Capture(PLAYER_BASE player, RuneState state)
+	// A appeler avant d'ecrire temporairement monsyo_id pour declencher un effet natif.
+	public static void BeginTemporaryNativeRune(PLAYER_BASE player, byte runeId)
 	{
-		PLAYER_MONSYO monsyo_data = player.monsyo_data;
-		if (monsyo_data != null)
+		if (player == null)
 		{
-			state.RuneIds[state.ActiveIndex] = ValidateRuneId(monsyo_data.monsyo_id);
-			if (monsyo_data.monsyo_id == 1)
+			return;
+		}
+		GetState(player);
+		if (!TemporaryNativeRunes.TryGetValue(player.chara_no, out List<byte> value))
+		{
+			value = new List<byte>();
+			TemporaryNativeRunes[player.chara_no] = value;
+		}
+		value.Add(runeId);
+	}
+
+	// A appeler apres avoir remis la rune active en place.
+	public static void EndTemporaryNativeRune(PLAYER_BASE player, byte runeId)
+	{
+		if (player != null && TemporaryNativeRunes.TryGetValue(player.chara_no, out List<byte> value))
+		{
+			int num = value.LastIndexOf(runeId);
+			if (num >= 0)
 			{
-				state.SoulEaterLevel = (byte)Math.Clamp((int)monsyo_data.monsyo_level, 0, 8);
+				value.RemoveAt(num);
+			}
+			if (value.Count == 0)
+			{
+				TemporaryNativeRunes.Remove(player.chara_no);
 			}
 		}
 	}
+
+	private static bool IsTemporaryNativeRune(int charaNo, byte runeId)
+	{
+		if (TemporaryNativeRunes.TryGetValue(charaNo, out List<byte> value))
+		{
+			return value.Contains(runeId);
+		}
+		return false;
+	}
+
+	// ---- Chargement / sauvegarde ----
 
 	internal static void NormalizeCurrentGame()
 	{
-		//IL_001c: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0022: Expected O, but got Unknown
-		try
-		{
-			GAME_WORK game_work = OldSrcBase.game_work;
-			if (game_work != null)
-			{
-				NormalizeGame(game_work);
-			}
-		}
-		catch (Exception ex)
-		{
-			ManualLogSource modLog = Plugin.ModLog;
-			bool flag = default(bool);
-			BepInExWarningLogInterpolatedStringHandler val = new BepInExWarningLogInterpolatedStringHandler(33, 1, out flag);
-			if (flag)
-			{
-				((BepInExLogInterpolatedStringHandler)val).AppendLiteral("Normalisation finale impossible: ");
-				((BepInExLogInterpolatedStringHandler)val).AppendFormatted<string>(ex.Message);
-			}
-			modLog.LogWarning(val);
-		}
 	}
 
+	// Apres CopySaveDataToGameWork : relit l'etat compact de TOUS les personnages puis remet
+	// la memoire de jeu au format vanilla (monsyo_exp sans signature).
 	internal static void PrepareGame(GAME_WORK game)
 	{
+		_loading = false;
+		Reset();
 		Il2CppReferenceArray<PLAYER_BASE> player_base = game.player_base;
 		if (player_base == null)
 		{
 			return;
 		}
+		int num = 0;
 		for (int i = 0; i < ((Il2CppArrayBase<PLAYER_BASE>)(object)player_base).Length; i++)
 		{
 			PLAYER_BASE val = ((Il2CppArrayBase<PLAYER_BASE>)(object)player_base)[i];
 			if (val != null && val.monsyo_data != null)
 			{
 				RuneState state = GetState(val);
-				if (Array.IndexOf(state.RuneIds, (byte)1) >= 0)
+				int num2 = Array.IndexOf(state.RuneIds, (byte)1);
+				if (num2 > 0)
 				{
-					int b = Array.IndexOf(state.RuneIds, (byte)1);
-					Swap(state.RuneIds, 0, b);
+					Swap(state.RuneIds, 0, num2);
 					state.ActiveIndex = 0;
-					WriteState(val, state);
 				}
-			}
-		}
-	}
-
-	internal static void NormalizeGame(GAME_WORK game)
-	{
-		Il2CppReferenceArray<PLAYER_BASE> player_base = game.player_base;
-		if (player_base == null)
-		{
-			return;
-		}
-		for (int i = 0; i < ((Il2CppArrayBase<PLAYER_BASE>)(object)player_base).Length; i++)
-		{
-			PLAYER_BASE val = ((Il2CppArrayBase<PLAYER_BASE>)(object)player_base)[i];
-			if (val != null && val.monsyo_data != null)
-			{
-				RuneState state = GetState(val);
-				Capture(val, state);
-				int num = Array.IndexOf(state.RuneIds, (byte)1);
-				if (num > 0)
-				{
-					Swap(state.RuneIds, 0, num);
-				}
-				state.ActiveIndex = 0;
 				WriteState(val, state);
+				if (state.RuneIds[1] != 0 || state.RuneIds[2] != 0)
+				{
+					num++;
+				}
 			}
 		}
+		Plugin.ModLog.LogInfo((object)$"R157 chargement : etat 3 runes relu pour {num} personnage(s) avec plusieurs runes.");
 	}
 
 	internal static RuneGameSnapshot SnapshotAndNormalizeForSave(GAME_WORK game)
@@ -715,20 +680,32 @@ internal static class RuneSlotService
 		for (int i = 0; i < ((Il2CppArrayBase<PLAYER_BASE>)(object)player_base).Length; i++)
 		{
 			PLAYER_BASE val = ((Il2CppArrayBase<PLAYER_BASE>)(object)player_base)[i];
-			if (val != null && val.monsyo_data != null)
+			if (val == null || val.monsyo_data == null)
 			{
-				RuneState state = GetState(val);
-				Capture(val, state);
-				RuneStateSnapshot runeStateSnapshot = new RuneStateSnapshot
-				{
-					ActiveIndex = state.ActiveIndex,
-					SoulEaterLevel = state.SoulEaterLevel
-				};
-				Array.Copy(state.RuneIds, runeStateSnapshot.RuneIds, state.RuneIds.Length);
-				runeGameSnapshot.Players[val.chara_no] = runeStateSnapshot;
+				continue;
+			}
+			RuneState state = GetState(val);
+			RuneStateSnapshot runeStateSnapshot = new RuneStateSnapshot
+			{
+				ActiveIndex = state.ActiveIndex,
+				SoulEaterLevel = state.SoulEaterLevel,
+				NativeExp = val.monsyo_data.monsyo_exp
+			};
+			Array.Copy(state.RuneIds, runeStateSnapshot.RuneIds, state.RuneIds.Length);
+			runeGameSnapshot.Players[val.chara_no] = runeStateSnapshot;
+			// Format de sauvegarde : Soul Eater en slot 1 et slot 1 actif, pour rester lisible en vanilla.
+			int num = Array.IndexOf(state.RuneIds, (byte)1);
+			if (num > 0)
+			{
+				Swap(state.RuneIds, 0, num);
+			}
+			state.ActiveIndex = 0;
+			WriteState(val, state);
+			if (state.RuneIds[1] != 0 || state.RuneIds[2] != 0)
+			{
+				WritePackedState(val, state);
 			}
 		}
-		NormalizeGame(game);
 		return runeGameSnapshot;
 	}
 
@@ -754,6 +731,7 @@ internal static class RuneSlotService
 				state.SoulEaterLevel = value.SoulEaterLevel;
 				state.ActiveIndex = Math.Clamp(value.ActiveIndex, 0, GetUnlockedSlotCount(val) - 1);
 				WriteState(val, state);
+				val.monsyo_data.monsyo_exp = (ushort)((value.NativeExp & Signature) != 0 ? 0 : value.NativeExp);
 				if (state.ActiveIndex > 0)
 				{
 					num++;
@@ -768,7 +746,7 @@ internal static class RuneSlotService
 		RuneState state = GetState(player);
 		int magic = GetMagic(player);
 		int unlockedSlotCount = GetUnlockedSlotCount(player);
-		string value = ((result == RuneCycleResult.Locked) ? $"Emplacement suivant verrouille (MAG {Plugin.SecondSlotMag.Value} requise)" : $"Rune active {state.ActiveIndex + 1}/{unlockedSlotCount}");
+		string value = ((result == RuneCycleResult.Locked) ? $"Emplacement suivant verrouille (MAG {((unlockedSlotCount <= 1) ? Plugin.SecondSlotMag.Value : Plugin.ThirdSlotMag.Value)} requise)" : $"Rune active {state.ActiveIndex + 1}/{unlockedSlotCount}");
 		string[] array = new string[3];
 		for (int i = 0; i < array.Length; i++)
 		{
@@ -779,32 +757,74 @@ internal static class RuneSlotService
 		return $"{context} - {value} - MAG {magic}\n{string.Join("   ", array)}";
 	}
 
+	// ---- Coeur ----
+
 	private static RuneState GetState(PLAYER_BASE player)
 	{
+		if (_loading)
+		{
+			return Decode(player);
+		}
 		int chara_no = player.chara_no;
 		if (States.TryGetValue(chara_no, out RuneState value))
 		{
+			Reconcile(player, value);
 			return value;
 		}
 		RuneState runeState = Decode(player);
 		States[chara_no] = runeState;
-		WriteState(player, runeState);
+		// Memoire de jeu au format vanilla : retire un eventuel etat compact laisse par une sauvegarde.
+		PLAYER_MONSYO monsyo_data = player.monsyo_data;
+		if (monsyo_data != null && (monsyo_data.monsyo_exp & Signature) != 0)
+		{
+			monsyo_data.monsyo_exp = 0;
+		}
 		return runeState;
+	}
+
+	// Si le jeu a change la rune active (boutique, evenement), l'emplacement actif la recoit.
+	// Les autres emplacements ne sont jamais touches. Une rune presentee temporairement n'est pas capturee.
+	private static void Reconcile(PLAYER_BASE player, RuneState state)
+	{
+		PLAYER_MONSYO monsyo_data = player.monsyo_data;
+		if (monsyo_data == null)
+		{
+			return;
+		}
+		byte b = ValidateRuneId(monsyo_data.monsyo_id);
+		byte b2 = state.RuneIds[state.ActiveIndex];
+		if (b == b2)
+		{
+			if (b == 1)
+			{
+				state.SoulEaterLevel = (byte)Math.Clamp((int)monsyo_data.monsyo_level, 0, 8);
+			}
+			return;
+		}
+		if (IsTemporaryNativeRune(player.chara_no, b))
+		{
+			return;
+		}
+		state.RuneIds[state.ActiveIndex] = b;
+		if (b == 1)
+		{
+			state.SoulEaterLevel = (byte)Math.Clamp((int)monsyo_data.monsyo_level, 0, 8);
+		}
+		LogOnce($"capture:{player.chara_no}:{state.ActiveIndex}:{b2}:{b}", $"R157 : equipement natif detecte pour personnage {player.chara_no}, slot {state.ActiveIndex + 1} : {GetRuneName(b2)} -> {GetRuneName(b)}.");
 	}
 
 	private static RuneState Decode(PLAYER_BASE player)
 	{
 		RuneState runeState = new RuneState();
 		PLAYER_MONSYO monsyo_data = player.monsyo_data;
+		if (monsyo_data == null)
+		{
+			return runeState;
+		}
 		ushort monsyo_exp = monsyo_data.monsyo_exp;
 		if ((monsyo_exp & 0x8000) == 0)
 		{
-			runeState.RuneIds[0] = ValidateRuneId(monsyo_data.monsyo_id);
-			runeState.RuneIds[1] = 0;
-			runeState.RuneIds[2] = 0;
-			runeState.ActiveIndex = 0;
-			runeState.SoulEaterLevel = (byte)((monsyo_data.monsyo_id == 1) ? ((byte)Math.Clamp((int)monsyo_data.monsyo_level, 0, 8)) : 0);
-			return runeState;
+			return NewVanillaState(monsyo_data);
 		}
 		int num = monsyo_exp & 0x7FFF;
 		int num2 = num / 3468;
@@ -824,6 +844,10 @@ internal static class RuneSlotService
 		int num9 = ((num4 == 2) ? 1 : 2);
 		runeState.RuneIds[num8] = ValidateRuneId((byte)num7);
 		runeState.RuneIds[num9] = ValidateRuneId((byte)num6);
+		if (monsyo_data.monsyo_id == 1)
+		{
+			runeState.SoulEaterLevel = (byte)Math.Clamp((int)monsyo_data.monsyo_level, 0, 8);
+		}
 		return runeState;
 	}
 
@@ -835,29 +859,29 @@ internal static class RuneSlotService
 		return runeState;
 	}
 
+	// Ecrit la rune active en memoire de jeu (format vanilla). Ne touche pas aux autres emplacements.
 	private static void WriteState(PLAYER_BASE player, RuneState state)
 	{
 		PLAYER_MONSYO monsyo_data = player.monsyo_data;
-		if (monsyo_data != null)
+		if (monsyo_data != null && !_loading)
 		{
 			int unlockedSlotCount = GetUnlockedSlotCount(player);
-			if (state.ActiveIndex >= unlockedSlotCount)
+			if (state.ActiveIndex >= unlockedSlotCount || state.ActiveIndex < 0)
 			{
 				state.ActiveIndex = 0;
 			}
-			byte b2 = (monsyo_data.monsyo_id = ValidateRuneId(state.RuneIds[state.ActiveIndex]));
-			monsyo_data.monsyo_level = GetNativeRuneLevel(player, state, b2);
-			if (IsRuneShopSelectionWindowVisible() && b2 != 1)
+			TemporaryNativeRunes.Remove(player.chara_no);
+			byte b = ValidateRuneId(state.RuneIds[state.ActiveIndex]);
+			monsyo_data.monsyo_id = b;
+			monsyo_data.monsyo_level = GetNativeRuneLevel(player, state, b);
+			if ((monsyo_data.monsyo_exp & Signature) != 0)
 			{
 				monsyo_data.monsyo_exp = 0;
-			}
-			else
-			{
-				WritePackedState(player, state);
 			}
 		}
 	}
 
+	// Format compact, utilise UNIQUEMENT pendant la copie vers la sauvegarde.
 	private static void WritePackedState(PLAYER_BASE player, RuneState state)
 	{
 		PLAYER_MONSYO monsyo_data = player.monsyo_data;
@@ -874,7 +898,7 @@ internal static class RuneSlotService
 		}
 	}
 
-	internal static int GetUnlockedSlotCount(PLAYER_BASE player)
+	public static int GetUnlockedSlotCount(PLAYER_BASE player)
 	{
 		int magic = GetMagic(player);
 		if (magic >= Plugin.ThirdSlotMag.Value)
@@ -929,6 +953,14 @@ internal static class RuneSlotService
 		{
 		}
 		return $"#{runeId}";
+	}
+
+	private static void LogOnce(string key, string message)
+	{
+		if (LoggedEvents.Count < 512 && LoggedEvents.Add(key))
+		{
+			Plugin.ModLog.LogInfo((object)message);
+		}
 	}
 
 	private static void Swap(byte[] values, int a, int b)

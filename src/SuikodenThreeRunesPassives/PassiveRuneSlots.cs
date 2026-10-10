@@ -11,70 +11,11 @@ namespace SuikodenThreeRunesPassives;
 
 internal static class PassiveRuneSlots
 {
-	private const int RuneRadix = 34;
-
-	private const int PairStates = 1156;
-
-	private const int LevelStates = 3468;
-
-	private const ushort Signature = 32768;
-
-	private const ushort PayloadMask = 32767;
-
-	private const int MagicStatIndex = 4;
-
-	private static int _secondSlotMag = 60;
-
-	private static int _thirdSlotMag = 120;
-
 	private static readonly HashSet<string> LoggedActivations = new HashSet<string>(StringComparer.Ordinal);
 
 	internal static void RefreshThresholdsFromMainPlugin()
 	{
-		//IL_0138: Unknown result type (might be due to invalid IL or missing references)
-		//IL_013f: Expected O, but got Unknown
-		//IL_00dc: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00e3: Expected O, but got Unknown
-		bool flag = default(bool);
-		try
-		{
-			Type type = (from a in AppDomain.CurrentDomain.GetAssemblies()
-				select a.GetType("SuikodenThreeRunes.Plugin", throwOnError: false)).FirstOrDefault((Type t) => (object)t != null);
-			if ((object)type != null)
-			{
-				BindingFlags bindingAttr = BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
-				if (type.GetField("SecondSlotMag", bindingAttr)?.GetValue(null) is ConfigEntry<int> val)
-				{
-					_secondSlotMag = Math.Clamp(val.Value, 0, 255);
-				}
-				if (type.GetField("ThirdSlotMag", bindingAttr)?.GetValue(null) is ConfigEntry<int> val2)
-				{
-					_thirdSlotMag = Math.Clamp(val2.Value, _secondSlotMag, 255);
-				}
-				ManualLogSource modLog = Plugin.ModLog;
-				BepInExInfoLogInterpolatedStringHandler val3 = new BepInExInfoLogInterpolatedStringHandler(52, 2, out flag);
-				if (flag)
-				{
-					((BepInExLogInterpolatedStringHandler)val3).AppendLiteral("R108 : seuils relus depuis le mod principal = ");
-					((BepInExLogInterpolatedStringHandler)val3).AppendFormatted<int>(_secondSlotMag);
-					((BepInExLogInterpolatedStringHandler)val3).AppendLiteral("/");
-					((BepInExLogInterpolatedStringHandler)val3).AppendFormatted<int>(_thirdSlotMag);
-					((BepInExLogInterpolatedStringHandler)val3).AppendLiteral(" MAG.");
-				}
-				modLog.LogInfo(val3);
-			}
-		}
-		catch (Exception ex)
-		{
-			ManualLogSource modLog2 = Plugin.ModLog;
-			BepInExWarningLogInterpolatedStringHandler val4 = new BepInExWarningLogInterpolatedStringHandler(61, 1, out flag);
-			if (flag)
-			{
-				((BepInExLogInterpolatedStringHandler)val4).AppendLiteral("R108 : seuils du mod principal illisibles; 60/120 utilises : ");
-				((BepInExLogInterpolatedStringHandler)val4).AppendFormatted<string>(ex.Message);
-			}
-			modLog2.LogWarning(val4);
-		}
+		Plugin.ModLog.LogInfo((object)$"R157 : etat des 3 runes lu directement dans le mod principal (seuils MAG {SuikodenThreeRunes.Plugin.SecondSlotMag.Value}/{SuikodenThreeRunes.Plugin.ThirdSlotMag.Value}).");
 	}
 
 	internal static bool HasEquippedRune(PLAYER_BASE? player, int runeId)
@@ -83,16 +24,7 @@ internal static class PassiveRuneSlots
 		{
 			return false;
 		}
-		PackedRuneState packedRuneState = Decode(player);
-		int unlockedSlotCount = GetUnlockedSlotCount(player);
-		for (int i = 0; i < unlockedSlotCount && i < packedRuneState.RuneIds.Length; i++)
-		{
-			if (packedRuneState.RuneIds[i] == runeId)
-			{
-				return true;
-			}
-		}
-		return false;
+		return Array.IndexOf(SuikodenThreeRunes.RuneSlotService.GetUnlockedRuneIds(player), (byte)runeId) >= 0;
 	}
 
 	internal static bool HasHiddenRune(PLAYER_BASE? player, int runeId)
@@ -110,11 +42,7 @@ internal static class PassiveRuneSlots
 		{
 			return Array.Empty<byte>();
 		}
-		PackedRuneState packedRuneState = Decode(player);
-		int num = Math.Min(GetUnlockedSlotCount(player), packedRuneState.RuneIds.Length);
-		byte[] array = new byte[num];
-		Array.Copy(packedRuneState.RuneIds, array, num);
-		return array;
+		return SuikodenThreeRunes.RuneSlotService.GetUnlockedRuneIds(player);
 	}
 
 	internal static RuneSwapState PresentHiddenRuneToNative(PLAYER_BASE? player, int runeId, string effectName)
@@ -130,6 +58,7 @@ internal static class PassiveRuneSlots
 		result.OriginalLevel = monsyo_data.monsyo_level;
 		result.PresentedRuneId = runeId;
 		result.Changed = true;
+		SuikodenThreeRunes.RuneSlotService.BeginTemporaryNativeRune(player, (byte)runeId);
 		monsyo_data.monsyo_id = (byte)runeId;
 		monsyo_data.monsyo_level = 0;
 		LogActivationOnce(player, runeId, effectName, result.OriginalId);
@@ -159,6 +88,7 @@ internal static class PassiveRuneSlots
 			{
 				state.Player.monsyo_data.monsyo_id = state.OriginalId;
 				state.Player.monsyo_data.monsyo_level = state.OriginalLevel;
+				SuikodenThreeRunes.RuneSlotService.EndTemporaryNativeRune(state.Player, (byte)state.PresentedRuneId);
 			}
 		}
 	}
@@ -299,57 +229,6 @@ internal static class PassiveRuneSlots
 		{
 		}
 		return -1;
-	}
-
-	private static PackedRuneState Decode(PLAYER_BASE player)
-	{
-		PLAYER_MONSYO monsyo_data = player.monsyo_data;
-		byte[] array = new byte[3];
-		ushort monsyo_exp = monsyo_data.monsyo_exp;
-		if ((monsyo_exp & 0x8000) == 0)
-		{
-			array[0] = ValidateRuneId(monsyo_data.monsyo_id);
-			return new PackedRuneState(array, 0);
-		}
-		int num = monsyo_exp & 0x7FFF;
-		int num2 = num / 3468;
-		int num3 = num % 3468;
-		int num4 = num3 / 1156;
-		int num5 = num3 % 1156;
-		int num6 = num5 / 34;
-		int num7 = num5 % 34;
-		if (num4 < 0 || num4 > 2 || num2 < 0 || num2 > 8)
-		{
-			array[0] = ValidateRuneId(monsyo_data.monsyo_id);
-			return new PackedRuneState(array, 0);
-		}
-		array[num4] = ValidateRuneId(monsyo_data.monsyo_id);
-		int num8 = ((num4 == 0) ? 1 : 0);
-		int num9 = ((num4 == 2) ? 1 : 2);
-		array[num8] = ValidateRuneId((byte)num7);
-		array[num9] = ValidateRuneId((byte)num6);
-		return new PackedRuneState(array, num4);
-	}
-
-	private static int GetUnlockedSlotCount(PLAYER_BASE player)
-	{
-		try
-		{
-			Il2CppStructArray<byte> noryoku = player.noryoku;
-			int num = ((noryoku != null && ((Il2CppArrayBase<byte>)(object)noryoku).Length > 4) ? ((Il2CppArrayBase<byte>)(object)noryoku)[4] : 0);
-			if (num >= _thirdSlotMag)
-			{
-				return 3;
-			}
-			if (num >= _secondSlotMag)
-			{
-				return 2;
-			}
-		}
-		catch
-		{
-		}
-		return 1;
 	}
 
 	private static byte ValidateRuneId(byte id)

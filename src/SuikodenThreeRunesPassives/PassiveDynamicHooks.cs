@@ -111,7 +111,26 @@ internal static class PassiveDynamicHooks
 		}
 	}
 
-	private static bool TryResolvePlayerFromArgs(object[]? args, out PLAYER_BASE? player, out int battleIndex)
+	private enum ArgRole
+	{
+		Actor,
+		Target
+	}
+
+	private static readonly HashSet<string> SignatureLogged = new HashSet<string>(StringComparer.Ordinal);
+
+	private static readonly string[] MonsterNameHints = new string[5] { "monster", "enemy", "mons", "teki", "enm" };
+
+	private static readonly string[] PlayerNameHints = new string[6] { "player", "chara", "pno", "p_no", "mikata", "member" };
+
+	private static readonly string[] TargetNameHints = new string[5] { "target", "guard", "mokuhyo", "def", "taisyo" };
+
+	private static readonly string[] ActorNameHints = new string[4] { "attack", "actor", "atk", "self" };
+
+	// Choisit l'argument qui designe le personnage concerne, d'apres le NOM des parametres natifs.
+	// L'ancienne version prenait le premier entier valide : pour monster_attack_sub, l'index du
+	// monstre etait pris pour un index de personnage et le passif s'appliquait au mauvais personnage.
+	private static bool TryResolvePlayerFromArgs(MethodBase? original, object[]? args, ArgRole role, out PLAYER_BASE? player, out int battleIndex)
 	{
 		player = null;
 		battleIndex = -1;
@@ -119,56 +138,125 @@ internal static class PassiveDynamicHooks
 		{
 			return false;
 		}
-		foreach (object obj in args)
+		ParameterInfo[] array = Array.Empty<ParameterInfo>();
+		try
 		{
-			int num;
-			try
+			array = original?.GetParameters() ?? Array.Empty<ParameterInfo>();
+		}
+		catch
+		{
+		}
+		LogSignatureOnce(original, array);
+		int num = -1;
+		int num2 = int.MinValue;
+		for (int i = 0; i < args.Length; i++)
+		{
+			string text = ((i < array.Length) ? (array[i].Name ?? string.Empty).ToLowerInvariant() : string.Empty);
+			if (!TryGetIndexArg(args[i], out var value) || HasHint(text, MonsterNameHints) || !PassiveRuneSlots.TryGetBattlePlayer(value, out PLAYER_BASE _))
 			{
-				if (obj == null)
-				{
-					continue;
-				}
-				num = Convert.ToInt32(obj);
-				goto IL_0026;
+				continue;
 			}
-			catch
+			int num3 = 0;
+			if (HasHint(text, PlayerNameHints))
 			{
+				num3 += 4;
 			}
-			continue;
-			IL_0026:
-			if (PassiveRuneSlots.TryGetBattlePlayer(num, out player) && player != null)
+			if (HasHint(text, (role == ArgRole.Target) ? TargetNameHints : ActorNameHints))
 			{
-				battleIndex = num;
+				num3 += 2;
+			}
+			if (HasHint(text, (role == ArgRole.Target) ? ActorNameHints : TargetNameHints))
+			{
+				num3 -= 3;
+			}
+			if (num3 > num2)
+			{
+				num2 = num3;
+				num = i;
+			}
+		}
+		// Sans nom exploitable pour une cible (monstre qui attaque), on ne devine pas.
+		if (num < 0 || (role == ArgRole.Target && num2 <= 0 && array.Length > 1))
+		{
+			return false;
+		}
+		TryGetIndexArg(args[num], out battleIndex);
+		return PassiveRuneSlots.TryGetBattlePlayer(battleIndex, out player) && player != null;
+	}
+
+	private static bool TryGetIndexArg(object? arg, out int value)
+	{
+		value = -1;
+		switch (arg)
+		{
+		case int num:
+			value = num;
+			return true;
+		case short num2:
+			value = num2;
+			return true;
+		case byte b:
+			value = b;
+			return true;
+		case sbyte b2:
+			value = b2;
+			return true;
+		case ushort num3:
+			value = num3;
+			return true;
+		default:
+			return false;
+		}
+	}
+
+	private static bool HasHint(string name, string[] hints)
+	{
+		if (name.Length == 0)
+		{
+			return false;
+		}
+		foreach (string value in hints)
+		{
+			if (name.Contains(value, StringComparison.Ordinal))
+			{
 				return true;
 			}
 		}
-		player = null;
-		battleIndex = -1;
 		return false;
 	}
 
-	private static void DoubleBeatPrefix(object[] __args, out RuneSwapState __state)
+	private static void LogSignatureOnce(MethodBase? original, ParameterInfo[] parameters)
+	{
+		string text = original?.Name ?? "?";
+		if (SignatureLogged.Add(text))
+		{
+			string value = string.Join(", ", Array.ConvertAll(parameters, (ParameterInfo p) => p.ParameterType.Name + " " + p.Name));
+			Plugin.ModLog.LogInfo((object)$"R157 PASSIF signature native : {text}({value}).");
+		}
+	}
+
+	private static void DoubleBeatPrefix(MethodBase __originalMethod, object[] __args, out RuneSwapState __state)
 	{
 		__state = default(RuneSwapState);
-		if (TryResolvePlayerFromArgs(__args, out PLAYER_BASE player, out int _) && player != null)
+		if (TryResolvePlayerFromArgs(__originalMethod, __args, ArgRole.Actor, out PLAYER_BASE player, out int _) && player != null)
 		{
 			__state = PassiveRuneSlots.PresentHiddenRuneToNative(player, Plugin.DoubleBeatRuneId.Value, "Double-Beat");
 		}
 	}
 
-	private static void KillerPrefix(object[] __args, out RuneSwapState __state)
+	private static void KillerPrefix(MethodBase __originalMethod, object[] __args, out RuneSwapState __state)
 	{
 		__state = default(RuneSwapState);
-		if (TryResolvePlayerFromArgs(__args, out PLAYER_BASE player, out int _) && player != null)
+		if (TryResolvePlayerFromArgs(__originalMethod, __args, ArgRole.Actor, out PLAYER_BASE player, out int _) && player != null)
 		{
 			__state = PassiveRuneSlots.PresentHiddenRuneToNative(player, Plugin.KillerRuneId.Value, "Tueur/Killer");
 		}
 	}
 
-	private static void CounterTurtlePrefix(object[] __args, out CounterTurtleState __state)
+	private static void CounterTurtlePrefix(MethodBase __originalMethod, object[] __args, out CounterTurtleState __state)
 	{
 		__state = new CounterTurtleState();
-		if (TryResolvePlayerFromArgs(__args, out PLAYER_BASE player, out int battleIndex) && player != null)
+		if (TryResolvePlayerFromArgs(__originalMethod, __args, ArgRole.Target, out PLAYER_BASE player, out int battleIndex) && player != null)
 		{
 			__state.CounterSwap = PassiveRuneSlots.PresentHiddenRuneToNative(player, Plugin.CounterRuneId.Value, "Contre/Counter");
 			if (PassiveRuneSlots.HasHiddenRune(player, Plugin.TurtleRuneId.Value))
@@ -212,11 +300,11 @@ internal static class PassiveDynamicHooks
 		return __exception;
 	}
 
-	private static void SunbeamFinishedPostfix(object[] __args)
+	private static void SunbeamFinishedPostfix(MethodBase __originalMethod, object[] __args)
 	{
 		try
 		{
-			if (!TryResolvePlayerFromArgs(__args, out PLAYER_BASE player, out int battleIndex) || player == null || !PassiveRuneSlots.HasHiddenRune(player, Plugin.SunbeamRuneId.Value))
+			if (!TryResolvePlayerFromArgs(__originalMethod, __args, ArgRole.Actor, out PLAYER_BASE player, out int battleIndex) || player == null || !PassiveRuneSlots.HasHiddenRune(player, Plugin.SunbeamRuneId.Value))
 			{
 				return;
 			}

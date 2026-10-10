@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Reflection;
 using System.Security.Cryptography;
 using BepInEx;
 using BepInEx.Configuration;
@@ -8,9 +9,11 @@ using BepInEx.Logging;
 using BepInEx.Unity.IL2CPP;
 using HarmonyLib;
 
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("SuikodenThreeRunesPassives")]
+
 namespace SuikodenThreeRunes;
 
-[BepInPlugin("fr.suikodenhd.threerunes", "Suikoden I - Trois runes selon la MAG", "0.9.6-r156-prearm-emblem")]
+[BepInPlugin("fr.suikodenhd.threerunes", "Suikoden I - Trois runes selon la MAG", "0.9.7-r157-fix")]
 [BepInDependency("d3xMachina.suikoden_fix", BepInDependency.DependencyFlags.SoftDependency)]
 public sealed class Plugin : BasePlugin
 {
@@ -18,7 +21,7 @@ public sealed class Plugin : BasePlugin
 
 	public const string Name = "Suikoden I - Trois runes selon la MAG";
 
-	public const string Version = "0.9.6-r156-prearm-emblem";
+	public const string Version = "0.9.7-r157-fix";
 
 	private const string SupportedGameAssemblySha256 = "e093f175eaf3734d293ca0a236c652dd7fcc72ea5fa10d7b21103edf12f11c3a";
 
@@ -50,7 +53,7 @@ public sealed class Plugin : BasePlugin
 			NormalizeThresholds();
 			RuneSlotService.Reset();
 			_harmony = new Harmony("fr.suikodenhd.threerunes");
-			_harmony.PatchAll(typeof(Plugin).Assembly);
+			SafePatchAll(_harmony, ModLog);
 			((BasePlugin)this).AddComponent<RuneController>();
 			ManualLogSource modLog = ModLog;
 			bool flag = default(bool);
@@ -59,7 +62,7 @@ public sealed class Plugin : BasePlugin
 			{
 				((BepInExLogInterpolatedStringHandler)val).AppendFormatted<string>("Suikoden I - Trois runes selon la MAG");
 				((BepInExLogInterpolatedStringHandler)val).AppendLiteral(" ");
-				((BepInExLogInterpolatedStringHandler)val).AppendFormatted<string>("0.9.6-r156-prearm-emblem");
+				((BepInExLogInterpolatedStringHandler)val).AppendFormatted<string>("0.9.7-r157-fix");
 				((BepInExLogInterpolatedStringHandler)val).AppendLiteral(" charge. Seuils MAG: ");
 				((BepInExLogInterpolatedStringHandler)val).AppendFormatted<int>(SecondSlotMag.Value);
 				((BepInExLogInterpolatedStringHandler)val).AppendLiteral("/");
@@ -67,6 +70,7 @@ public sealed class Plugin : BasePlugin
 				((BepInExLogInterpolatedStringHandler)val).AppendLiteral(".");
 			}
 			modLog.LogInfo(val);
+			ModLog.LogInfo((object)"R157 : etat 3 runes garde par le mod; monsyo_exp reste vanilla en jeu et ne sert qu'a la sauvegarde (compatible avec les anciennes sauvegardes).");
 			ModLog.LogInfo((object)"R156 CLEAN : UI R148/R151 conservee; aucune nouvelle fenetre. Le meme m_emblem natif reste le selecteur 3-runes.");
 			ModLog.LogInfo((object)"R156 CLEAN : Pie-grieche active utilise temporairement une rune magique secondaire comme carrier natif pour rouvrir le meme selecteur 3-runes; stockage et ActiveIndex restent inchanges.");
 			ModLog.LogInfo((object)"R156 CLEAN : si le selecteur attend B mais que le dispatcher est sur command_magic02/10, ce seul handler est route vers command_magic01 natif afin que Cancel soit reellement lu.");
@@ -74,6 +78,38 @@ public sealed class Plugin : BasePlugin
 			ModLog.LogInfo((object)"R156 DIRECT-RUNTIME : Pie-grieche garde le stockage 3-runes en memoire mais presente monsyo_exp=0 au moteur natif pendant ciblage/execution; garde player_magic_sub installee.");
 			ModLog.LogInfo((object)"R156 PIE-GRIECHE : c_item est maintenu a 0 pendant le chemin direct natif; aucune autre donnee de commande n'est forcee. UI R148/R151 conservee.");
 		}
+	}
+
+	// Applique chaque classe de patch separement : un point natif introuvable ne desactive plus tout le mod.
+	internal static int SafePatchAll(Harmony harmony, ManualLogSource log)
+	{
+		int num = 0;
+		Type[] types;
+		try
+		{
+			types = typeof(Plugin).Assembly.GetTypes();
+		}
+		catch (ReflectionTypeLoadException ex)
+		{
+			types = Array.FindAll(ex.Types, (Type? t) => t != null)!;
+		}
+		foreach (Type type in types)
+		{
+			if (type.GetCustomAttributes(typeof(HarmonyPatch), inherit: true).Length == 0)
+			{
+				continue;
+			}
+			try
+			{
+				harmony.CreateClassProcessor(type).Patch();
+				num++;
+			}
+			catch (Exception ex2)
+			{
+				log.LogError((object)("Patch " + type.Name + " non applique (fonction concernee desactivee) : " + ex2.GetBaseException().Message));
+			}
+		}
+		return num;
 	}
 
 	private static bool IsSupportedGameBuild()

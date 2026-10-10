@@ -4,4 +4,8 @@
     <RootNamespace>SuikodenThreeRunesPassives</RootNamespace>
   </PropertyGroup>
   <Import Project="../Mod.targets" />
+  <ItemGroup>
+    <!-- Dependance dure (BepInDependency) : le mod principal est toujours charge avant cet addon. -->
+    <ProjectReference Include="../SuikodenThreeRunes/SuikodenThreeRunes.csproj" Private="false" />
+  </ItemGroup>
 </Project>
