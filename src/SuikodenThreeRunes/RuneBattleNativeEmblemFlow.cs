@@ -2501,18 +2501,61 @@ internal static class RuneBattleNativeEmblemFlow
 				_cursorOffLookupDone = true;
 				_cursorOffProperty = list.GetType().GetProperty("m_isCursorOFFInFocus", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public);
 			}
-			if (_cursorOffProperty == null || !(_cursorOffProperty.GetValue(list) is bool flag) || !flag)
+			if (!_selectionDiagLogged)
+			{
+				_selectionDiagLogged = true;
+				try
+				{
+					UIBattleManager instance = Singleton<UIBattleManager>.Instance;
+					UIWindowList? magic = instance?.battleWindow?.m_magic;
+					Plugin.ModLog.LogInfo((object)("R168 comparaison liste Sorts : " + RuneSlotService.DescribeNative(magic)));
+					if (magic != null && magic.cellList != null && magic.cellList.Count > 0)
+					{
+						Plugin.ModLog.LogInfo((object)("R168 cellule Sorts : " + RuneSlotService.DescribeNative(magic.cellList[0])));
+					}
+					if (list.cellList != null && list.cellList.Count > 0)
+					{
+						Plugin.ModLog.LogInfo((object)("R168 cellule Runes : " + RuneSlotService.DescribeNative(list.cellList[0])));
+					}
+				}
+				catch
+				{
+				}
+			}
+			bool changed = false;
+			if (_choosableProperty == null)
+			{
+				_choosableProperty = list.GetType().GetProperty("IsChoosable", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public);
+			}
+			if (_choosableProperty != null && _choosableProperty.CanWrite && _choosableProperty.GetValue(list) is bool flag2 && !flag2)
+			{
+				if (_choosableOwner == null)
+				{
+					_choosableOwner = list;
+				}
+				_choosableProperty.SetValue(list, true);
+				changed = true;
+			}
+			if (_cursorOffProperty != null && _cursorOffProperty.GetValue(list) is bool flag && flag)
+			{
+				if (_cursorOffOwner == null)
+				{
+					_cursorOffOwner = list;
+					_cursorOffOriginal = flag;
+				}
+				_cursorOffProperty.SetValue(list, false);
+				changed = true;
+			}
+			if (!changed)
 			{
 				return;
 			}
-			if (_cursorOffOwner == null)
-			{
-				_cursorOffOwner = list;
-				_cursorOffOriginal = flag;
-			}
-			_cursorOffProperty.SetValue(list, false);
 			SetNativeCursor(_selectedSlot);
-			Plugin.ModLog.LogInfo((object)"R167 barre de selection Runes affichee (m_isCursorOFFInFocus -> False).");
+			if (_barLogs < 3)
+			{
+				_barLogs++;
+				Plugin.ModLog.LogInfo((object)$"R168 barre de selection Runes : IsChoosable -> True (modifiable={_choosableProperty?.CanWrite}), m_isCursorOFFInFocus -> False.");
+			}
 		}
 		catch
 		{
@@ -2521,19 +2564,31 @@ internal static class RuneBattleNativeEmblemFlow
 
 	private static void RestoreSelectionBar()
 	{
-		if (_cursorOffOwner == null)
-		{
-			return;
-		}
 		try
 		{
-			_cursorOffProperty?.SetValue(_cursorOffOwner, _cursorOffOriginal);
+			if (_cursorOffOwner != null)
+			{
+				_cursorOffProperty?.SetValue(_cursorOffOwner, _cursorOffOriginal);
+			}
+			if (_choosableOwner != null && _choosableProperty != null && _choosableProperty.CanWrite)
+			{
+				_choosableProperty.SetValue(_choosableOwner, false);
+			}
 		}
 		catch
 		{
 		}
 		_cursorOffOwner = null;
+		_choosableOwner = null;
 	}
+
+	private static System.Reflection.PropertyInfo? _choosableProperty;
+
+	private static UIWindowList? _choosableOwner;
+
+	private static bool _selectionDiagLogged;
+
+	private static int _barLogs;
 
 	// R166 : apres B, la liste native gardait parfois son curseur visuel sur la ligne 2 (m_selectedIndex=1)
 	// alors que le curseur reel etait sur la ligne 1 (window_index=0) : le curseur affiche ne suivait plus
@@ -2554,6 +2609,10 @@ internal static class RuneBattleNativeEmblemFlow
 			if (_selectedIndexProperty == null || !(_selectedIndexProperty.GetValue(list) is int num) || num == _selectedSlot || _selectedSlot < 0 || _selectedSlot > 2)
 			{
 				return;
+			}
+			if (_selectedIndexProperty.CanWrite)
+			{
+				_selectedIndexProperty.SetValue(list, _selectedSlot);
 			}
 			SetNativeCursor(_selectedSlot);
 			if (_cursorCorrections < 5)

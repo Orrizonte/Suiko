@@ -37,6 +37,11 @@ Le mod vérifie l'empreinte SHA-256 de `GameAssembly.dll`. Après une mise à jo
 - **Menu principal › Runes** : ←/→ change l'emplacement actif.
 - **Combat › Runes** : la fenêtre affiche les 3 emplacements ; A valide la rune et ouvre ses sorts, B revient aux commandes.
 
+## Changements de la version 0.9.19-r168
+
+- **Barre de sélection (2e essai)** : désactiver `m_isCursorOFFInFocus` ne suffisait pas. La liste Runes native est aussi marquée non sélectionnable (`IsChoosable=False`) : elle est rendue sélectionnable pendant le sélecteur, puis rétablie à la sortie. Le curseur interne `m_selectedIndex` est maintenant écrit directement, car `SetSelectCell` ne le mettait pas à jour.
+- Diagnostic : comparaison avec la liste des Sorts (qui a une barre) au premier affichage, lignes `R168`.
+
 ## Changements de la version 0.9.18-r167
 
 - **Barre de sélection visible dans la fenêtre Runes en combat** : la fenêtre native est une fenêtre d'affichage dont le drapeau `m_isCursorOFFInFocus=True` masque la barre de sélection. Il est désactivé tant que le sélecteur 3 runes est ouvert, puis rétabli (ligne de log `R167`).
