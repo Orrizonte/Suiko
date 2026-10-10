@@ -2057,7 +2057,10 @@ internal static class RuneBattleNativeEmblemFlow
 		bool flag2 = false;
 		int num2 = ((window_work != null) ? window_work.index_level : (-1));
 		int num3 = ((window_work != null) ? window_work.window_step : (-1));
-		if (_selectorOpenedFromMagicBack && !_directNativeRune && window_work != null && _runeEntryStateCaptured && window_work.index_level == _runeEntryIndexLevel && window_work.window_step == _runeEntryWindowStep)
+		// R165 : apres un retour par B, l'etat natif vaut level=1/step=2 (pose par ReturnFromSpellsToRunes) et
+		// non l'etat d'entree memorise (1/1) : la condition d'origine echouait et la liste de sorts restait au
+		// niveau Runes (sorts non selectionnables, il fallait annuler jusqu'aux commandes).
+		if (_selectorOpenedFromMagicBack && !_directNativeRune && window_work != null && window_work.index_level != 2)
 		{
 			window_work.index_level = 2;
 			window_work.window_step = 0;
@@ -2271,6 +2274,8 @@ internal static class RuneBattleNativeEmblemFlow
 			_selectorLogged = false;
 			_selectorNeedsSettledRebuild = true;
 			EnsureThreeRowHeight(emblem);
+			// R165 : curseur visuel natif aligne sur l'emplacement reel avant la reouverture.
+			emblem.SetSelectCell(_selectedSlot);
 			instance.OpenWindowUI((WindowType)8, true);
 			ManualLogSource modLog2 = Plugin.ModLog;
 			val = new BepInExInfoLogInterpolatedStringHandler(88, 4, out flag);

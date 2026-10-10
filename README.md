@@ -37,6 +37,12 @@ Le mod vérifie l'empreinte SHA-256 de `GameAssembly.dll`. Après une mise à jo
 - **Menu principal › Runes** : ←/→ change l'emplacement actif.
 - **Combat › Runes** : la fenêtre affiche les 3 emplacements ; A valide la rune et ouvre ses sorts, B revient aux commandes.
 
+## Changements de la version 0.9.16-r165
+
+- **Sorts non sélectionnables après un B** : après un retour Sorts → Runes, valider une rune laissait le jeu au niveau « Runes » (`etat=1/2` dans le log au lieu de `2/0`). La liste de sorts s'affichait mais restait bloquée jusqu'à l'annulation complète. Le passage au niveau « Sorts » est maintenant forcé après un retour par B.
+- Au retour par B, le curseur visuel de la liste est aligné sur l'emplacement réel avant la réouverture.
+- Tir : l'association dans l'emplacement libre fonctionne (log : « personnage 8 a recu Rune de l'air »).
+
 ## Changements de la version 0.9.15-r164
 
 - **Lignes fusionnées après B** : le log montre que le bug apparaît quand la fenêtre Runes s'ouvre avec le curseur ailleurs que sur la ligne 1. L'animation d'ouverture du jeu affiche alors la liste à partir de la ligne sélectionnée. Le sélecteur s'ouvre maintenant toujours sur le premier emplacement utilisable, y compris au retour par B.
