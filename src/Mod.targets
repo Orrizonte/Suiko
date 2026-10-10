@@ -1,0 +1,28 @@
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <LangVersion>11.0</LangVersion>
+    <Nullable>annotations</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+    <DebugType>none</DebugType>
+    <NoWarn>$(NoWarn);CS8632;CS0162;CS0168;CS0219</NoWarn>
+    <OutputPath>$(MSBuildThisFileDirectory)../build/$(AssemblyName)/</OutputPath>
+  </PropertyGroup>
+
+  <!-- References reelles du jeu -->
+  <ItemGroup Condition="'$(UseGameReferences)' == 'true'">
+    <Reference Include="$(GameDir)/BepInEx/core/BepInEx.Core.dll" Private="false" />
+    <Reference Include="$(GameDir)/BepInEx/core/BepInEx.Unity.IL2CPP.dll" Private="false" />
+    <Reference Include="$(GameDir)/BepInEx/core/0Harmony.dll" Private="false" />
+    <Reference Include="$(GameDir)/BepInEx/core/Il2CppInterop.Runtime.dll" Private="false" />
+    <Reference Include="$(GameDir)/BepInEx/interop/*.dll" Private="false" />
+  </ItemGroup>
+
+  <!-- Stubs (aucune DLL du jeu requise) -->
+  <ItemGroup Condition="'$(UseGameReferences)' != 'true'">
+    <ProjectReference Include="$(MSBuildThisFileDirectory)../stubs/*/*.csproj" Private="false" />
+  </ItemGroup>
+</Project>

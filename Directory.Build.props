@@ -1,0 +1,12 @@
+<Project>
+  <!--
+    Compilation :
+      - avec le jeu installe :  dotnet build -c Release -p:GameDir="C:\Program Files (x86)\Steam\steamapps\common\Suikoden I and II HD Remaster"
+        (utilise BepInEx/core et BepInEx/interop generes par BepInEx au premier lancement)
+      - sans le jeu : dotnet build -c Release   (utilise les stubs du dossier stubs/, suffisant pour produire les DLL)
+  -->
+  <PropertyGroup>
+    <GameDir Condition="'$(GameDir)' == ''"></GameDir>
+    <UseGameReferences Condition="'$(GameDir)' != ''">true</UseGameReferences>
+  </PropertyGroup>
+</Project>

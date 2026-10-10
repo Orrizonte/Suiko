@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>SuikodenThreeRunesPassives</AssemblyName>
+    <RootNamespace>SuikodenThreeRunesPassives</RootNamespace>
+  </PropertyGroup>
+  <Import Project="../Mod.targets" />
+</Project>

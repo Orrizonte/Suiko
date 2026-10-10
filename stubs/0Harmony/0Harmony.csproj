@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Assembly de reference (stub) : sert uniquement a compiler le mod sans le jeu.
+       Ne JAMAIS copier ce fichier dans BepInEx : le vrai est genere par BepInEx dans BepInEx/interop. -->
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <AssemblyName>0Harmony</AssemblyName>
+    <AssemblyVersion>2.10.2.0</AssemblyVersion>
+    <Nullable>disable</Nullable>
+    <NoWarn>$(NoWarn);CS0626;CS0067;CS8618;CS0114;CS0108;CS1591;CS0649</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+  </ItemGroup>
+</Project>
