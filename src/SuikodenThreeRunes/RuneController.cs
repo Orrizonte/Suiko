@@ -17,6 +17,8 @@ public sealed class RuneController : MonoBehaviour
 		MainMenu
 	}
 
+	private int _repackFrame;
+
 	private float _messageUntil;
 
 	private string _message = string.Empty;
@@ -90,6 +92,15 @@ public sealed class RuneController : MonoBehaviour
 		}
 		try
 		{
+			// R159 : remet l'etat compact en memoire apres boutique / Pie-grieche (toutes les ~0,5 s).
+			if (++_repackFrame >= 30)
+			{
+				_repackFrame = 0;
+				if (!RuneBattleNativeEmblemFlow.IsBusy)
+				{
+					RuneSlotService.RepackAll();
+				}
+			}
 			Keyboard current = Keyboard.current;
 			Gamepad current2 = Gamepad.current;
 			bool flag = (current != null && ((ButtonControl)current.escapeKey).wasPressedThisFrame) || (current2 != null && current2.buttonEast.wasPressedThisFrame);

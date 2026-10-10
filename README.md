@@ -37,6 +37,12 @@ Le mod vérifie l'empreinte SHA-256 de `GameAssembly.dll`. Après une mise à jo
 - **Menu principal › Runes** : ←/→ change l'emplacement actif.
 - **Combat › Runes** : la fenêtre affiche les 3 emplacements ; A valide la rune et ouvre ses sorts, B revient aux commandes.
 
+## Changements de la version 0.9.10-r159
+
+- **Runes du 2e emplacement perdues après sauvegarde** : depuis 0.9.7, l'état des 3 emplacements n'était écrit dans `monsyo_exp` que pendant `CopyGameWorkToSaveData`. Le log montre qu'une sauvegarde a été faite sans passer par ce chemin. L'état est de nouveau gardé **en permanence** en mémoire de jeu, comme dans la version d'origine : toute sauvegarde le contient. Il est remis à 0 uniquement quand le moteur l'exige (boutique ouverte, Pie-grièche pendant le ciblage/l'exécution), puis réécrit automatiquement. Les runes déjà perdues dans une sauvegarde ne peuvent pas être récupérées.
+- Chaque sauvegarde écrit une ligne `R159 sauvegarde : …` dans le log, et la liste des fonctions de sauvegarde du jeu est écrite au démarrage (diagnostic).
+- L'avertissement « DIRECT-CARRIER : aucune rune magique secondaire » (Pie-grièche seule) n'est plus répété à chaque image.
+
 ## Changements de la version 0.9.9-r159
 
 - Les deux mods sont fusionnés en un seul : `SuikodenThreeRunes.dll`.
@@ -51,7 +57,7 @@ Le mod vérifie l'empreinte SHA-256 de `GameAssembly.dll`. Après une mise à jo
 
 **Stockage (runes perdues ou dupliquées, passifs inactifs, boutique)**
 
-Jusqu'ici, l'état des 3 runes était caché en permanence dans le champ natif `monsyo_exp`. Or le moteur lit ce champ : il bloquait « Retirer » en boutique et cassait Pie-grièche. Le mod devait donc le remettre à 0 par moments, et l'état disparaissait alors de la mémoire du jeu.
+*(Remplacé en 0.9.10 : voir ci-dessus.)* Jusqu'ici, l'état des 3 runes était caché en permanence dans le champ natif `monsyo_exp`. Or le moteur lit ce champ : il bloquait « Retirer » en boutique et cassait Pie-grièche. Le mod devait donc le remettre à 0 par moments, et l'état disparaissait alors de la mémoire du jeu.
 
 Désormais :
 

@@ -7,7 +7,4 @@ internal sealed class RuneStateSnapshot
 	public int ActiveIndex;
 
 	public byte SoulEaterLevel;
-
-	// Valeur de monsyo_exp en jeu avant la copie de sauvegarde, restauree juste apres.
-	public ushort NativeExp;
 }

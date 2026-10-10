@@ -11,7 +11,7 @@ using HarmonyLib;
 
 namespace SuikodenThreeRunes;
 
-[BepInPlugin("fr.suikodenhd.threerunes", "Suikoden I - Trois runes selon la MAG", "0.9.9-r159-merged")]
+[BepInPlugin("fr.suikodenhd.threerunes", "Suikoden I - Trois runes selon la MAG", "0.9.10-r159")]
 [BepInDependency("d3xMachina.suikoden_fix", BepInDependency.DependencyFlags.SoftDependency)]
 public sealed class Plugin : BasePlugin
 {
@@ -19,7 +19,7 @@ public sealed class Plugin : BasePlugin
 
 	public const string Name = "Suikoden I - Trois runes selon la MAG";
 
-	public const string Version = "0.9.9-r159-merged";
+	public const string Version = "0.9.10-r159";
 
 	private const string SupportedGameAssemblySha256 = "e093f175eaf3734d293ca0a236c652dd7fcc72ea5fa10d7b21103edf12f11c3a";
 
@@ -54,6 +54,7 @@ public sealed class Plugin : BasePlugin
 			Passives.PassiveConfig.Bind(((BasePlugin)this).Config);
 			SafePatchAll(_harmony, ModLog);
 			Passives.PassiveConfig.Install(_harmony);
+			LogSaveMethods();
 			((BasePlugin)this).AddComponent<RuneController>();
 			ManualLogSource modLog = ModLog;
 			bool flag = default(bool);
@@ -62,7 +63,7 @@ public sealed class Plugin : BasePlugin
 			{
 				((BepInExLogInterpolatedStringHandler)val).AppendFormatted<string>("Suikoden I - Trois runes selon la MAG");
 				((BepInExLogInterpolatedStringHandler)val).AppendLiteral(" ");
-				((BepInExLogInterpolatedStringHandler)val).AppendFormatted<string>("0.9.9-r159-merged");
+				((BepInExLogInterpolatedStringHandler)val).AppendFormatted<string>("0.9.10-r159");
 				((BepInExLogInterpolatedStringHandler)val).AppendLiteral(" charge. Seuils MAG: ");
 				((BepInExLogInterpolatedStringHandler)val).AppendFormatted<int>(SecondSlotMag.Value);
 				((BepInExLogInterpolatedStringHandler)val).AppendLiteral("/");
@@ -70,7 +71,7 @@ public sealed class Plugin : BasePlugin
 				((BepInExLogInterpolatedStringHandler)val).AppendLiteral(".");
 			}
 			modLog.LogInfo(val);
-			ModLog.LogInfo((object)"R157 : etat 3 runes garde par le mod; monsyo_exp reste vanilla en jeu et ne sert qu'a la sauvegarde (compatible avec les anciennes sauvegardes).");
+			ModLog.LogInfo((object)"R159 : etat 3 runes garde en memoire de jeu en permanence (toute sauvegarde le contient); compatible avec les anciennes sauvegardes.");
 			ModLog.LogInfo((object)"R156 CLEAN : UI R148/R151 conservee; aucune nouvelle fenetre. Le meme m_emblem natif reste le selecteur 3-runes.");
 			ModLog.LogInfo((object)"R156 CLEAN : Pie-grieche active utilise temporairement une rune magique secondaire comme carrier natif pour rouvrir le meme selecteur 3-runes; stockage et ActiveIndex restent inchanges.");
 			ModLog.LogInfo((object)"R156 CLEAN : si le selecteur attend B mais que le dispatcher est sur command_magic02/10, ce seul handler est route vers command_magic01 natif afin que Cancel soit reellement lu.");
@@ -110,6 +111,22 @@ public sealed class Plugin : BasePlugin
 			}
 		}
 		return num;
+	}
+
+	// Diagnostic : fonctions de SaveDataManager disponibles (chemins de sauvegarde/chargement du jeu).
+	private static void LogSaveMethods()
+	{
+		try
+		{
+			MethodInfo[] methods = typeof(SaveDataManager).GetMethods(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.DeclaredOnly);
+			string[] array = Array.ConvertAll(methods, (MethodInfo m) => m.Name);
+			Array.Sort(array, StringComparer.Ordinal);
+			ModLog.LogInfo((object)("R159 diagnostic SaveDataManager : " + string.Join(", ", array)));
+		}
+		catch (Exception ex)
+		{
+			ModLog.LogWarning((object)("R159 diagnostic SaveDataManager impossible : " + ex.Message));
+		}
 	}
 
 	private static bool IsSupportedGameBuild()

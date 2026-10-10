@@ -7,16 +7,15 @@ namespace SuikodenThreeRunes;
 
 // Stockage des trois emplacements de rune.
 //
-// Source de verite : le dictionnaire States (par chara_no).
-// En memoire de jeu, PLAYER_MONSYO contient uniquement la rune ACTIVE (monsyo_id/monsyo_level),
-// exactement comme en vanilla : monsyo_exp n'est plus jamais detourne pendant le jeu.
-// Le format compact (bit 0x8000 de monsyo_exp) n'est ecrit que le temps de la copie vers la
-// sauvegarde (BeforeSavePatch) puis relu au chargement (AfterLoadPatch). Les sauvegardes
-// existantes restent donc compatibles.
+// Source de verite : le dictionnaire States (par chara_no), qui sert a tout le mod (menus, combat, passifs).
+// En memoire de jeu, PLAYER_MONSYO contient la rune ACTIVE (monsyo_id/monsyo_level) et, pour les
+// personnages qui ont des runes dans d'autres emplacements, l'etat compact dans monsyo_exp (bit 0x8000).
 //
-// Avant ce changement, monsyo_exp contenait l'etat compact en permanence. Le moteur natif lit ce
-// champ (boutique "Retirer", Pie-grieche...), ce qui obligeait a le remettre a 0 a certains moments;
-// l'etat compact disparaissait alors de la memoire et l'addon des passifs ne voyait plus les slots 2/3.
+// R159 : l'etat compact reste EN PERMANENCE en memoire (comme avant r157) pour que toute sauvegarde du jeu
+// le contienne, quel que soit le chemin de sauvegarde utilise. En r157/r158 il n'etait ecrit que pendant
+// CopyGameWorkToSaveData et des emplacements 2/3 ont ete perdus.
+// Exceptions ou le moteur doit voir monsyo_exp=0 : boutique de runes ouverte (Retirer) et Pie-grieche
+// pendant ciblage/execution. RepackAll() remet l'etat compact des que ces situations sont terminees.
 public static class RuneSlotService
 {
 	private const int RuneRadix = 34;
@@ -467,7 +466,7 @@ public static class RuneSlotService
 	internal static void EnterRuneShopCompatibility(PLAYER_BASE player)
 	{
 		RuneState state = GetState(player);
-		WriteState(player, state);
+		ApplyNativeExp(player, state);
 		byte b = state.RuneIds[state.ActiveIndex];
 		bool flag = b == 1 || IsNativeFixedRune(player.chara_no, b);
 		Plugin.ModLog.LogInfo((object)$"R107 boutique : chara={player.chara_no}, slot={state.ActiveIndex + 1}, rune={b}, monsyo_level={player.monsyo_data?.monsyo_level}, statut={(flag ? "fixe" : "amovible")}.");
@@ -483,6 +482,7 @@ public static class RuneSlotService
 		}
 		byte before = state.RuneIds[state.ActiveIndex];
 		GetState(player);
+		ApplyNativeExp(player, state);
 		if (before != 0 && state.RuneIds[state.ActiveIndex] == 0)
 		{
 			Plugin.ModLog.LogInfo((object)$"R107 boutique : retrait natif detecte pour personnage {player.chara_no}, slot {state.ActiveIndex + 1}, rune {before} -> vide.");
@@ -493,6 +493,7 @@ public static class RuneSlotService
 	{
 		RuneState state = GetState(player);
 		WriteState(player, state);
+		RepackAll();
 	}
 
 	internal static RuneState GetDisplayState(PLAYER_BASE player)
@@ -688,8 +689,7 @@ public static class RuneSlotService
 			RuneStateSnapshot runeStateSnapshot = new RuneStateSnapshot
 			{
 				ActiveIndex = state.ActiveIndex,
-				SoulEaterLevel = state.SoulEaterLevel,
-				NativeExp = val.monsyo_data.monsyo_exp
+				SoulEaterLevel = state.SoulEaterLevel
 			};
 			Array.Copy(state.RuneIds, runeStateSnapshot.RuneIds, state.RuneIds.Length);
 			runeGameSnapshot.Players[val.chara_no] = runeStateSnapshot;
@@ -701,11 +701,13 @@ public static class RuneSlotService
 			}
 			state.ActiveIndex = 0;
 			WriteState(val, state);
-			if (state.RuneIds[1] != 0 || state.RuneIds[2] != 0)
+			if (HasOtherRunes(state))
 			{
 				WritePackedState(val, state);
+				runeGameSnapshot.MultiRuneCount++;
 			}
 		}
+		Plugin.ModLog.LogInfo((object)$"R159 sauvegarde : etat 3 runes ecrit pour {runeGameSnapshot.MultiRuneCount} personnage(s) avec plusieurs runes.");
 		return runeGameSnapshot;
 	}
 
@@ -731,7 +733,6 @@ public static class RuneSlotService
 				state.SoulEaterLevel = value.SoulEaterLevel;
 				state.ActiveIndex = Math.Clamp(value.ActiveIndex, 0, GetUnlockedSlotCount(val) - 1);
 				WriteState(val, state);
-				val.monsyo_data.monsyo_exp = (ushort)((value.NativeExp & Signature) != 0 ? 0 : value.NativeExp);
 				if (state.ActiveIndex > 0)
 				{
 					num++;
@@ -773,12 +774,6 @@ public static class RuneSlotService
 		}
 		RuneState runeState = Decode(player);
 		States[chara_no] = runeState;
-		// Memoire de jeu au format vanilla : retire un eventuel etat compact laisse par une sauvegarde.
-		PLAYER_MONSYO monsyo_data = player.monsyo_data;
-		if (monsyo_data != null && (monsyo_data.monsyo_exp & Signature) != 0)
-		{
-			monsyo_data.monsyo_exp = 0;
-		}
 		return runeState;
 	}
 
@@ -874,14 +869,89 @@ public static class RuneSlotService
 			byte b = ValidateRuneId(state.RuneIds[state.ActiveIndex]);
 			monsyo_data.monsyo_id = b;
 			monsyo_data.monsyo_level = GetNativeRuneLevel(player, state, b);
-			if ((monsyo_data.monsyo_exp & Signature) != 0)
-			{
-				monsyo_data.monsyo_exp = 0;
-			}
+			ApplyNativeExp(player, state);
 		}
 	}
 
-	// Format compact, utilise UNIQUEMENT pendant la copie vers la sauvegarde.
+	private static bool HasOtherRunes(RuneState state)
+	{
+		for (int i = 0; i < 3; i++)
+		{
+			if (i != state.ActiveIndex && state.RuneIds[i] != 0)
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
+	// monsyo_exp attendu : 0 en boutique (sauf Soul Eater), etat compact si d'autres emplacements sont
+	// remplis, sinon valeur vanilla (sans signature).
+	private static void ApplyNativeExp(PLAYER_BASE player, RuneState state)
+	{
+		PLAYER_MONSYO monsyo_data = player.monsyo_data;
+		if (monsyo_data == null)
+		{
+			return;
+		}
+		byte b = ValidateRuneId(state.RuneIds[state.ActiveIndex]);
+		if (IsRuneShopSelectionWindowVisible() && b != 1)
+		{
+			monsyo_data.monsyo_exp = 0;
+		}
+		else if (HasOtherRunes(state) || (b != 1 && state.SoulEaterLevel != 0 && Array.IndexOf(state.RuneIds, (byte)1) >= 0))
+		{
+			WritePackedState(player, state);
+		}
+		else if ((monsyo_data.monsyo_exp & Signature) != 0)
+		{
+			monsyo_data.monsyo_exp = 0;
+		}
+	}
+
+	// Remet l'etat compact en memoire pour tous les personnages connus (apres boutique / Pie-grieche).
+	// N'ecrit que monsyo_exp, jamais la rune active.
+	internal static int RepackAll()
+	{
+		if (_loading || States.Count == 0 || IsRuneShopSelectionWindowVisible())
+		{
+			return 0;
+		}
+		int num = 0;
+		try
+		{
+			GAME_WORK game_work = OldSrcBase.game_work;
+			Il2CppReferenceArray<PLAYER_BASE> val = ((game_work != null) ? game_work.player_base : null);
+			if (val == null)
+			{
+				return 0;
+			}
+			for (int i = 0; i < ((Il2CppArrayBase<PLAYER_BASE>)(object)val).Length; i++)
+			{
+				PLAYER_BASE val2 = ((Il2CppArrayBase<PLAYER_BASE>)(object)val)[i];
+				if (val2 == null || val2.monsyo_data == null || !States.TryGetValue(val2.chara_no, out RuneState value) || TemporaryNativeRunes.ContainsKey(val2.chara_no))
+				{
+					continue;
+				}
+				if (ValidateRuneId(val2.monsyo_data.monsyo_id) != value.RuneIds[value.ActiveIndex])
+				{
+					continue;
+				}
+				ushort monsyo_exp = val2.monsyo_data.monsyo_exp;
+				ApplyNativeExp(val2, value);
+				if (val2.monsyo_data.monsyo_exp != monsyo_exp)
+				{
+					num++;
+				}
+			}
+		}
+		catch
+		{
+		}
+		return num;
+	}
+
+	// Format compact (voir l'en-tete du fichier).
 	private static void WritePackedState(PLAYER_BASE player, RuneState state)
 	{
 		PLAYER_MONSYO monsyo_data = player.monsyo_data;

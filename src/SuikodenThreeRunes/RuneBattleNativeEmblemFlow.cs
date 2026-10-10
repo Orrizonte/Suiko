@@ -184,6 +184,21 @@ internal static class RuneBattleNativeEmblemFlow
 
 	private static float _expandedHeightDelta;
 
+	private static readonly HashSet<int> CarrierWarningLogged = new HashSet<int>();
+
+	// Vrai pendant le selecteur 3-runes / la liste des sorts / une presentation Pie-grieche.
+	internal static bool IsBusy
+	{
+		get
+		{
+			if (_stage == CombatStage.Idle && !_selectorCarrierPrimed)
+			{
+				return _directNativeRune;
+			}
+			return true;
+		}
+	}
+
 	private static bool IsPassiveRune(byte runeId)
 	{
 		return PassiveRuneIds.Contains(runeId);
@@ -762,6 +777,10 @@ internal static class RuneBattleNativeEmblemFlow
 		bool flag = default(bool);
 		if (num3 < 0)
 		{
+			if (!CarrierWarningLogged.Add(player.chara_no))
+			{
+				return false;
+			}
 			ManualLogSource modLog = Plugin.ModLog;
 			BepInExWarningLogInterpolatedStringHandler val = new BepInExWarningLogInterpolatedStringHandler(123, 3, out flag);
 			if (flag)
