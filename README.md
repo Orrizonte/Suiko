@@ -37,6 +37,13 @@ Le mod vérifie l'empreinte SHA-256 de `GameAssembly.dll`. Après une mise à jo
 - **Menu principal › Runes** : ←/→ change l'emplacement actif.
 - **Combat › Runes** : la fenêtre affiche les 3 emplacements ; A valide la rune et ouvre ses sorts, B revient aux commandes.
 
+## Changements de la version 0.9.13-r162
+
+- **Lignes fusionnées après B** : au retour par B avec le curseur sur l'emplacement 2 ou 3, la liste native défilait d'une ligne et la ligne 1 passait sous le titre. Le défilement est maintenant annulé tant que le sélecteur est ouvert ; le log affiche `R162 DEFILEMENT Runes annule` quand c'est le cas.
+- **Boutique, « Sur qui voulez-vous équiper ceci ? »** : le panneau affichait les emplacements du propriétaire de l'orbe au lieu du personnage sous le curseur. Il suit maintenant le curseur pendant le choix de la cible, et ←/→ choisit l'emplacement de cette cible.
+- **Restauration** : la valeur préremplie de la 0.9.12 est retirée automatiquement, les runes ayant été retrouvées dans la sauvegarde.
+- **Diagnostics** pour Tir (« Ça ne peut pas être associé ») : liste des fonctions de la boutique, et champs natifs de la cible sous le curseur.
+
 ## Restaurer des runes perdues (0.9.12-r161)
 
 Le fichier `BepInEx/config/fr.suikodenhd.threerunes.cfg` contient une section `[Restauration]` :
@@ -49,7 +56,7 @@ Chaque entrée s'écrit `personnage:rune1/rune2/rune3`. Une rune s'écrit par so
 - la rune actuellement équipée du personnage est celle de l'emplacement 1 ;
 - ses emplacements 2 et 3 sont vides.
 
-La valeur par défaut reprend l'état relevé dans le log du premier test : héros Feu/Air, perso 17 Foudre/Brume, perso 23 Pie-grièche/Torrent. Après chaque chargement, le log liste tous les personnages qui portent une rune (`R161 personnages avec runes`), pour retrouver les numéros.
+La valeur par défaut est vide (depuis 0.9.13). Après chaque chargement, le log liste tous les personnages qui portent une rune (`R161 personnages avec runes`), pour retrouver les numéros.
 
 ## Changements de la version 0.9.11-r160
 

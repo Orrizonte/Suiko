@@ -1795,6 +1795,7 @@ internal static class RuneBattleNativeEmblemFlow
 			}
 			_stage = CombatStage.RuneSelector;
 			_geometryCorrections = 0;
+			_scrollCorrections = 0;
 			_confirmArmed = !ProbeIsOn((GRInputManager.Type)4);
 			_selectorUpHeld = ProbeIsOn((GRInputManager.Type)0);
 			_selectorDownHeld = ProbeIsOn((GRInputManager.Type)1);
@@ -2250,6 +2251,7 @@ internal static class RuneBattleNativeEmblemFlow
 			}
 			_stage = CombatStage.RuneSelector;
 			_geometryCorrections = 0;
+			_scrollCorrections = 0;
 			_selectorOpenedFromMagicBack = true;
 			_spellConfirmBlockedUntilRelease = false;
 			_confirmArmed = !ProbeIsOn((GRInputManager.Type)4);
@@ -2434,21 +2436,26 @@ internal static class RuneBattleNativeEmblemFlow
 				{
 					BaseGeometry.Clear();
 				}
-				value = (emblem.m_rectTransform.sizeDelta.y, emblem.m_contents.sizeDelta.y, emblem.m_unFocusedHeight);
+				value = (emblem.m_rectTransform.sizeDelta.y, emblem.m_contents.sizeDelta.y, emblem.m_unFocusedHeight, emblem.m_contents.anchoredPosition.y);
 				BaseGeometry[pointer] = value;
 			}
 			_originalWindowSize = new Vector2(emblem.m_rectTransform.sizeDelta.x, value.Window);
 			_originalContentsSize = new Vector2(emblem.m_contents.sizeDelta.x, value.Contents);
 			_originalUnfocusedHeight = value.Unfocused;
+			_originalContentsPosY = value.ContentsPosY;
 			_expandedHeightDelta = 0f;
 		}
 	}
 
-	private static readonly System.Collections.Generic.Dictionary<IntPtr, (float Window, float Contents, float Unfocused)> BaseGeometry = new System.Collections.Generic.Dictionary<IntPtr, (float, float, float)>();
+	private static readonly System.Collections.Generic.Dictionary<IntPtr, (float Window, float Contents, float Unfocused, float ContentsPosY)> BaseGeometry = new System.Collections.Generic.Dictionary<IntPtr, (float, float, float, float)>();
+
+	private static float _originalContentsPosY;
 
 	private static float _rowHeight;
 
 	private static int _geometryCorrections;
+
+	private static int _scrollCorrections;
 
 	// R160 : appele a chaque image (LateUpdate, apres les animations du jeu). Quand la fenetre Runes reprend
 	// le focus (retour par B depuis les sorts), l'animation native lui redonne sa hauteur d'une seule rune et
@@ -2466,6 +2473,19 @@ internal static class RuneBattleNativeEmblemFlow
 			float num2 = _originalContentsSize.y + _expandedHeightDelta;
 			Vector2 sizeDelta = geometryOwner.m_rectTransform.sizeDelta;
 			Vector2 sizeDelta2 = geometryOwner.m_contents.sizeDelta;
+			// R162 : au retour par B avec le curseur sur l'emplacement 2/3, la liste native defilait d'une
+			// ligne (elle croit n'afficher que 2 lignes) : la ligne 1 passait sous le titre et les lignes
+			// semblaient fusionnees. Les 3 lignes tiennent dans la fenetre agrandie : pas de defilement.
+			Vector2 anchoredPosition = geometryOwner.m_contents.anchoredPosition;
+			if (Math.Abs(anchoredPosition.y - _originalContentsPosY) >= 0.5f)
+			{
+				geometryOwner.m_contents.anchoredPosition = new Vector2(anchoredPosition.x, _originalContentsPosY);
+				if (_scrollCorrections < 5)
+				{
+					_scrollCorrections++;
+					Plugin.ModLog.LogInfo((object)$"R162 DEFILEMENT Runes annule : contenu y {anchoredPosition.y:0.##}->{_originalContentsPosY:0.##}.");
+				}
+			}
 			if (Math.Abs(sizeDelta.y - num) < 0.5f && Math.Abs(sizeDelta2.y - num2) < 0.5f)
 			{
 				return;

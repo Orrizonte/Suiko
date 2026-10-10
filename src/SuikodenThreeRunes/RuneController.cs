@@ -19,6 +19,10 @@ public sealed class RuneController : MonoBehaviour
 
 	private int _repackFrame;
 
+	private bool _shopTargetPhase;
+
+	private int _shopTargetIndex = int.MinValue;
+
 	private bool _guiLogged;
 
 	private bool _shopPanelLogged;
@@ -157,8 +161,25 @@ public sealed class RuneController : MonoBehaviour
 				_shopLockedCharaNo = int.MinValue;
 				_shopReturnPending = false;
 				_shopPlayerWindowWasActive = false;
+				_shopTargetPhase = false;
 			}
-			if (_shopLockedCharaNo != int.MinValue && flag)
+			// R162 : apres le choix d'un orbe dans l'inventaire (A dans la liste d'objets), le jeu demande
+			// "Sur qui voulez-vous equiper ceci ?" : le panneau doit suivre le personnage sous le curseur,
+			// et non le proprietaire de l'inventaire.
+			bool flagTargetConsumed = false;
+			if (_shopTargetPhase && (flag || flag4))
+			{
+				_shopTargetPhase = false;
+				flagTargetConsumed = flag;
+				Plugin.ModLog.LogInfo((object)("R162 boutique : fin du choix de la cible (" + (flag ? "B" : "A") + "). " + RuneSlotService.DescribeShopWork()));
+			}
+			else if (num && _shopLockedCharaNo != int.MinValue && flag4 && RuneSlotService.IsRuneShopItemWindowVisible())
+			{
+				_shopTargetPhase = true;
+				_shopTargetIndex = int.MinValue;
+				Plugin.ModLog.LogInfo((object)("R162 boutique : choix de la cible ('Sur qui...') ; le panneau suit le curseur. " + RuneSlotService.DescribeShopWork()));
+			}
+			if (_shopLockedCharaNo != int.MinValue && flag && !flagTargetConsumed)
 			{
 				_shopReturnPending = true;
 				ManualLogSource modLog2 = Plugin.ModLog;
@@ -199,12 +220,17 @@ public sealed class RuneController : MonoBehaviour
 				}
 				modLog4.LogInfo(val);
 			}
-			if (!RuneSlotService.TryGetSelectedPlayer(_shopLockedCharaNo, out PLAYER_BASE player, out string context) || player == null)
+			if (!RuneSlotService.TryGetSelectedPlayer(_shopLockedCharaNo, _shopTargetPhase, out PLAYER_BASE player, out string context) || player == null)
 			{
 				_showShopSlots = false;
 				return;
 			}
 			bool flag6 = context == "Boutique de runes" && RuneSlotService.IsRuneShopSelectionWindowVisible();
+			if (_shopTargetPhase && flag6 && player.chara_no != _shopTargetIndex)
+			{
+				_shopTargetIndex = player.chara_no;
+				Plugin.ModLog.LogInfo((object)$"R162 boutique : cible sous le curseur = personnage {player.chara_no}; PLAYER_BASE({RuneSlotService.DescribeNative(player)}); PLAYER_MONSYO({RuneSlotService.DescribeNative(player.monsyo_data)}).");
+			}
 			if (!flag6 && _shopCompatibilityPlayer != null)
 			{
 				RuneSlotService.ExitRuneShopCompatibility(_shopCompatibilityPlayer);

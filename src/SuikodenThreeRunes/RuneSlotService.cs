@@ -192,6 +192,11 @@ public static class RuneSlotService
 	// principal inactifs pour le reste de la session.
 	internal static bool TryGetSelectedPlayer(int lockedCharaNo, out PLAYER_BASE? player, out string context)
 	{
+		return TryGetSelectedPlayer(lockedCharaNo, followShopCursor: false, out player, out context);
+	}
+
+	internal static bool TryGetSelectedPlayer(int lockedCharaNo, bool followShopCursor, out PLAYER_BASE? player, out string context)
+	{
 		player = null;
 		context = string.Empty;
 		try
@@ -199,6 +204,11 @@ public static class RuneSlotService
 			h_monsyo_c.MONSYO_WORK monsyo_work = h_monsyo_c.monsyo_work;
 			if (monsyo_work != null && IsRuneShopSelectionWindowVisible(monsyo_work))
 			{
+				if (followShopCursor && TryFromParty(monsyo_work.player_data, monsyo_work.index, -1, out player))
+				{
+					context = "Boutique de runes";
+					return true;
+				}
 				if (lockedCharaNo != int.MinValue && TryFromPartyByCharaNo(monsyo_work.player_data, lockedCharaNo, out player))
 				{
 					context = "Boutique de runes";
@@ -260,6 +270,82 @@ public static class RuneSlotService
 		}
 		player = null;
 		return false;
+	}
+
+	// Diagnostic : champs simples d'un objet natif (PLAYER_BASE, PLAYER_MONSYO...).
+	internal static string DescribeNative(object? obj)
+	{
+		if (obj == null)
+		{
+			return "null";
+		}
+		List<string> list = new List<string>();
+		try
+		{
+			foreach (System.Reflection.PropertyInfo property in obj.GetType().GetProperties(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public))
+			{
+				Type propertyType = property.PropertyType;
+				if (property.GetIndexParameters().Length == 0 && (propertyType.IsPrimitive || propertyType.IsEnum) && property.Name != "Pointer" && property.Name != "WasCollected")
+				{
+					try
+					{
+						list.Add(property.Name + "=" + property.GetValue(obj));
+					}
+					catch
+					{
+					}
+				}
+			}
+		}
+		catch
+		{
+		}
+		return string.Join(",", list);
+	}
+
+	// Diagnostic : valeurs simples de MONSYO_WORK et visibilite des fenetres de la boutique.
+	internal static string DescribeShopWork()
+	{
+		try
+		{
+			h_monsyo_c.MONSYO_WORK monsyo_work = h_monsyo_c.monsyo_work;
+			if (monsyo_work == null)
+			{
+				return "MONSYO_WORK=null";
+			}
+			List<string> list = new List<string>();
+			foreach (System.Reflection.PropertyInfo property in monsyo_work.GetType().GetProperties(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public))
+			{
+				Type propertyType = property.PropertyType;
+				if (property.GetIndexParameters().Length == 0 && (propertyType.IsPrimitive || propertyType.IsEnum))
+				{
+					try
+					{
+						list.Add(property.Name + "=" + property.GetValue(monsyo_work));
+					}
+					catch
+					{
+					}
+				}
+			}
+			List<string> list2 = new List<string>();
+			Il2CppReferenceArray<WIN> window = monsyo_work.window;
+			if (window != null)
+			{
+				for (int i = 0; i < ((Il2CppArrayBase<WIN>)(object)window).Length; i++)
+				{
+					if (IsWindowVisible(monsyo_work, i))
+					{
+						list2.Add(i.ToString());
+					}
+				}
+			}
+			return "MONSYO_WORK(" + string.Join(",", list) + "); fenetres visibles=[" + string.Join(",", list2) + "]";
+		}
+		catch (Exception ex)
+		{
+			return "MONSYO_WORK illisible: " + ex.Message;
+		}
 	}
 
 	internal static bool IsRuneShopSelectionWindowVisible()

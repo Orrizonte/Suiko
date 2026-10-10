@@ -6,7 +6,7 @@ namespace UnityEngine
     public class Behaviour : Component { }
     public class MonoBehaviour : Behaviour { public MonoBehaviour(IntPtr pointer) { } }
     public class Transform : Component { }
-    public class RectTransform : Transform { public Vector2 sizeDelta { get => default; set { } } public Rect rect => default; }
+    public class RectTransform : Transform { public Vector2 sizeDelta { get => default; set { } } public Vector2 anchoredPosition { get => default; set { } } public Rect rect => default; }
     public class Texture : Object { }
     public class Texture2D : Texture { public static Texture2D whiteTexture => null; }
     public struct Vector2 { public float x; public float y; public Vector2(float x, float y) { this.x = x; this.y = y; } }
