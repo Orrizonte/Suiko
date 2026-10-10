@@ -1794,6 +1794,7 @@ internal static class RuneBattleNativeEmblemFlow
 				window_work.window_index = _selectedSlot;
 			}
 			_stage = CombatStage.RuneSelector;
+			_geometryCorrections = 0;
 			_confirmArmed = !ProbeIsOn((GRInputManager.Type)4);
 			_selectorUpHeld = ProbeIsOn((GRInputManager.Type)0);
 			_selectorDownHeld = ProbeIsOn((GRInputManager.Type)1);
@@ -2248,6 +2249,7 @@ internal static class RuneBattleNativeEmblemFlow
 				window_work.window_index = _selectedSlot;
 			}
 			_stage = CombatStage.RuneSelector;
+			_geometryCorrections = 0;
 			_selectorOpenedFromMagicBack = true;
 			_spellConfirmBlockedUntilRelease = false;
 			_confirmArmed = !ProbeIsOn((GRInputManager.Type)4);
@@ -2423,10 +2425,63 @@ internal static class RuneBattleNativeEmblemFlow
 		if (!(((geometryOwner != null) ? new IntPtr?(((Il2CppObjectBase)geometryOwner).Pointer) : null) == ((Il2CppObjectBase)emblem).Pointer))
 		{
 			_geometryOwner = emblem;
-			_originalWindowSize = emblem.m_rectTransform.sizeDelta;
-			_originalContentsSize = emblem.m_contents.sizeDelta;
-			_originalUnfocusedHeight = emblem.m_unFocusedHeight;
+			// R160 : la taille native n'est memorisee qu'une fois par fenetre. La re-memoriser alors que la
+			// fenetre etait encore agrandie (321 au lieu de 214 dans le log) faussait toutes les hauteurs.
+			IntPtr pointer = ((Il2CppObjectBase)emblem).Pointer;
+			if (!BaseGeometry.TryGetValue(pointer, out var value))
+			{
+				if (BaseGeometry.Count > 32)
+				{
+					BaseGeometry.Clear();
+				}
+				value = (emblem.m_rectTransform.sizeDelta.y, emblem.m_contents.sizeDelta.y, emblem.m_unFocusedHeight);
+				BaseGeometry[pointer] = value;
+			}
+			_originalWindowSize = new Vector2(emblem.m_rectTransform.sizeDelta.x, value.Window);
+			_originalContentsSize = new Vector2(emblem.m_contents.sizeDelta.x, value.Contents);
+			_originalUnfocusedHeight = value.Unfocused;
 			_expandedHeightDelta = 0f;
+		}
+	}
+
+	private static readonly System.Collections.Generic.Dictionary<IntPtr, (float Window, float Contents, float Unfocused)> BaseGeometry = new System.Collections.Generic.Dictionary<IntPtr, (float, float, float)>();
+
+	private static float _rowHeight;
+
+	private static int _geometryCorrections;
+
+	// R160 : appele a chaque image (LateUpdate, apres les animations du jeu). Quand la fenetre Runes reprend
+	// le focus (retour par B depuis les sorts), l'animation native lui redonne sa hauteur d'une seule rune et
+	// les 3 lignes se superposaient. On re-impose la hauteur 3 lignes tant que le selecteur est ouvert.
+	internal static void MaintainSelectorGeometry()
+	{
+		if (_stage != CombatStage.RuneSelector || _geometryOwner == null || _expandedHeightDelta <= 0f)
+		{
+			return;
+		}
+		try
+		{
+			UIWindowList geometryOwner = _geometryOwner;
+			float num = _originalWindowSize.y + _expandedHeightDelta;
+			float num2 = _originalContentsSize.y + _expandedHeightDelta;
+			Vector2 sizeDelta = geometryOwner.m_rectTransform.sizeDelta;
+			Vector2 sizeDelta2 = geometryOwner.m_contents.sizeDelta;
+			if (Math.Abs(sizeDelta.y - num) < 0.5f && Math.Abs(sizeDelta2.y - num2) < 0.5f)
+			{
+				return;
+			}
+			geometryOwner.m_rectTransform.sizeDelta = new Vector2(sizeDelta.x, num);
+			geometryOwner.m_contents.sizeDelta = new Vector2(sizeDelta2.x, num2);
+			geometryOwner.m_unFocusedHeight = _originalUnfocusedHeight + _expandedHeightDelta;
+			LayoutRebuilder.ForceRebuildLayoutImmediate(geometryOwner.m_contents);
+			if (_geometryCorrections < 5)
+			{
+				_geometryCorrections++;
+				Plugin.ModLog.LogInfo((object)$"R160 GEOMETRIE Runes re-imposee : fenetre {sizeDelta.y:0.##}->{num:0.##}, contenu {sizeDelta2.y:0.##}->{num2:0.##}.");
+			}
+		}
+		catch
+		{
 		}
 	}
 
@@ -2473,6 +2528,16 @@ internal static class RuneBattleNativeEmblemFlow
 				num = val.cellList[0].height;
 			}
 		}
+		// R160 : juste apres la recreation des cellules (retour par B), leur hauteur peut etre fausse.
+		// On garde la plus grande hauteur de ligne valide deja mesuree.
+		if (num > 0.01f && num > _rowHeight)
+		{
+			_rowHeight = num;
+		}
+		else if (_rowHeight > 0.01f)
+		{
+			num = _rowHeight;
+		}
 		if (num <= 0.01f)
 		{
 			num = Math.Max(1f, _originalUnfocusedHeight * 0.55f);
@@ -2499,6 +2564,7 @@ internal static class RuneBattleNativeEmblemFlow
 		}
 		try
 		{
+			LayoutRebuilder.ForceRebuildLayoutImmediate(geometryOwner.m_contents);
 			geometryOwner.m_rectTransform.sizeDelta = new Vector2(geometryOwner.m_rectTransform.sizeDelta.x, _originalWindowSize.y);
 			geometryOwner.m_contents.sizeDelta = new Vector2(geometryOwner.m_contents.sizeDelta.x, _originalContentsSize.y);
 			geometryOwner.m_unFocusedHeight = _originalUnfocusedHeight;

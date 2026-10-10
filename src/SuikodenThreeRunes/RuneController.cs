@@ -19,6 +19,10 @@ public sealed class RuneController : MonoBehaviour
 
 	private int _repackFrame;
 
+	private bool _guiLogged;
+
+	private bool _shopPanelLogged;
+
 	private float _messageUntil;
 
 	private string _message = string.Empty;
@@ -506,6 +510,11 @@ public sealed class RuneController : MonoBehaviour
 		{
 			return;
 		}
+		if (!_guiLogged)
+		{
+			_guiLogged = true;
+			Plugin.ModLog.LogInfo((object)"R160 diagnostic : OnGUI actif (surimpressions possibles).");
+		}
 		try
 		{
 			bool num = _selectorSurface != SlotSelectionSurface.None;
@@ -530,6 +539,11 @@ public sealed class RuneController : MonoBehaviour
 
 	private void DrawShopPanel()
 	{
+		if (!_shopPanelLogged)
+		{
+			_shopPanelLogged = true;
+			Plugin.ModLog.LogInfo((object)("R160 diagnostic : panneau boutique dessine, ecran " + Screen.width + "x" + Screen.height + " : " + _shopSlots.Replace('\n', '|')));
+		}
 		//IL_0089: Unknown result type (might be due to invalid IL or missing references)
 		//IL_00a2: Unknown result type (might be due to invalid IL or missing references)
 		//IL_00ca: Unknown result type (might be due to invalid IL or missing references)
@@ -637,6 +651,22 @@ public sealed class RuneController : MonoBehaviour
 		GUI.color = color;
 		GUI.DrawTexture(rect, (Texture)(object)Texture2D.whiteTexture);
 		GUI.color = color2;
+	}
+
+	private void LateUpdate()
+	{
+		if (_controllerFaulted)
+		{
+			return;
+		}
+		try
+		{
+			RuneBattleNativeEmblemFlow.MaintainSelectorGeometry();
+		}
+		catch (Exception ex)
+		{
+			Plugin.ModLog.LogWarning((object)("R160 maintien de la fenetre Runes impossible : " + ex.Message));
+		}
 	}
 
 	private void OnApplicationQuit()
