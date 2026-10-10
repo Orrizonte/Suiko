@@ -11,7 +11,7 @@ using HarmonyLib;
 
 namespace SuikodenThreeRunes;
 
-[BepInPlugin("fr.suikodenhd.threerunes", "Suikoden I - Trois runes selon la MAG", "0.9.11-r160")]
+[BepInPlugin("fr.suikodenhd.threerunes", "Suikoden I - Trois runes selon la MAG", "0.9.12-r161")]
 [BepInDependency("d3xMachina.suikoden_fix", BepInDependency.DependencyFlags.SoftDependency)]
 public sealed class Plugin : BasePlugin
 {
@@ -19,7 +19,7 @@ public sealed class Plugin : BasePlugin
 
 	public const string Name = "Suikoden I - Trois runes selon la MAG";
 
-	public const string Version = "0.9.11-r160";
+	public const string Version = "0.9.12-r161";
 
 	private const string SupportedGameAssemblySha256 = "e093f175eaf3734d293ca0a236c652dd7fcc72ea5fa10d7b21103edf12f11c3a";
 
@@ -32,6 +32,8 @@ public sealed class Plugin : BasePlugin
 	internal static ConfigEntry<bool> ShowOverlay;
 
 	internal static ConfigEntry<bool> ShowShopSlots;
+
+	internal static ConfigEntry<string> RestoreRunes;
 
 	private Harmony? _harmony;
 
@@ -48,6 +50,7 @@ public sealed class Plugin : BasePlugin
 			ThirdSlotMag = ((BasePlugin)this).Config.Bind<int>("Emplacements", "MAG_Troisieme_Rune", 120, "Statistique MAG minimale pour ouvrir le troisieme emplacement (0 a 255).");
 			ShowOverlay = ((BasePlugin)this).Config.Bind<bool>("Affichage", "Afficher_Indication", true, "Affiche brievement la rune active, les trois emplacements et la MAG.");
 			ShowShopSlots = ((BasePlugin)this).Config.Bind<bool>("Affichage", "Afficher_3_Emplacements_Boutique", true, "Affiche les trois emplacements et leur selection dans la boutique de runes.");
+			RestoreRunes = ((BasePlugin)this).Config.Bind<string>("Restauration", "Runes_a_restaurer", "1:2/4/0; 17:5/18/0; 23:9/28/0", "Restauration manuelle appliquee une fois au chargement d'une partie. Format : chara:rune1/rune2/rune3 separes par ';' (ID ou nom de rune, '-' = vide). Une entree n'est appliquee que si la rune equipee correspond a l'emplacement 1 et que les emplacements 2/3 sont vides; elle est ensuite retiree. Valeur par defaut : etat releve dans le log du 1er test (heros Feu/Air, perso 17 Foudre/Brume, perso 23 Pie-grieche/Torrent).");
 			NormalizeThresholds();
 			RuneSlotService.Reset();
 			_harmony = new Harmony("fr.suikodenhd.threerunes");
@@ -63,7 +66,7 @@ public sealed class Plugin : BasePlugin
 			{
 				((BepInExLogInterpolatedStringHandler)val).AppendFormatted<string>("Suikoden I - Trois runes selon la MAG");
 				((BepInExLogInterpolatedStringHandler)val).AppendLiteral(" ");
-				((BepInExLogInterpolatedStringHandler)val).AppendFormatted<string>("0.9.11-r160");
+				((BepInExLogInterpolatedStringHandler)val).AppendFormatted<string>("0.9.12-r161");
 				((BepInExLogInterpolatedStringHandler)val).AppendLiteral(" charge. Seuils MAG: ");
 				((BepInExLogInterpolatedStringHandler)val).AppendFormatted<int>(SecondSlotMag.Value);
 				((BepInExLogInterpolatedStringHandler)val).AppendLiteral("/");

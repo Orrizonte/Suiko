@@ -630,6 +630,41 @@ public static class RuneSlotService
 		return false;
 	}
 
+	internal static byte[] GetStoredRuneIds(PLAYER_BASE player)
+	{
+		RuneState state = GetState(player);
+		return (byte[])state.RuneIds.Clone();
+	}
+
+	// R161 : restauration manuelle (voir RuneRestore). Slot 1 doit correspondre a la rune actuellement
+	// equipee et les slots 2/3 doivent etre vides.
+	internal static bool TryRestoreSlots(PLAYER_BASE player, byte[] runeIds, out string reason)
+	{
+		RuneState state = GetState(player);
+		byte b = ValidateRuneId(player.monsyo_data.monsyo_id);
+		if (b != runeIds[0])
+		{
+			reason = $"rune equipee actuelle {GetRuneName(b)} differente de l'emplacement 1 demande ({GetRuneName(runeIds[0])}).";
+			return false;
+		}
+		for (int i = 0; i < 3; i++)
+		{
+			if (i != state.ActiveIndex && state.RuneIds[i] != 0)
+			{
+				reason = $"l'emplacement {i + 1} contient deja {GetRuneName(state.RuneIds[i])}.";
+				return false;
+			}
+		}
+		state.ActiveIndex = 0;
+		for (int j = 0; j < 3; j++)
+		{
+			state.RuneIds[j] = ValidateRuneId(runeIds[j]);
+		}
+		WriteState(player, state);
+		reason = string.Empty;
+		return true;
+	}
+
 	// ---- Chargement / sauvegarde ----
 
 	internal static void NormalizeCurrentGame()
@@ -668,6 +703,7 @@ public static class RuneSlotService
 			}
 		}
 		Plugin.ModLog.LogInfo((object)$"R157 chargement : etat 3 runes relu pour {num} personnage(s) avec plusieurs runes.");
+		RuneRestore.Apply(game);
 	}
 
 	internal static RuneGameSnapshot SnapshotAndNormalizeForSave(GAME_WORK game)

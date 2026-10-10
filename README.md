@@ -37,6 +37,20 @@ Le mod vérifie l'empreinte SHA-256 de `GameAssembly.dll`. Après une mise à jo
 - **Menu principal › Runes** : ←/→ change l'emplacement actif.
 - **Combat › Runes** : la fenêtre affiche les 3 emplacements ; A valide la rune et ouvre ses sorts, B revient aux commandes.
 
+## Restaurer des runes perdues (0.9.12-r161)
+
+Le fichier `BepInEx/config/fr.suikodenhd.threerunes.cfg` contient une section `[Restauration]` :
+
+```
+Runes_a_restaurer = 1:2/4/0; 17:5/18/0; 23:9/28/0
+```
+
+Chaque entrée s'écrit `personnage:rune1/rune2/rune3`. Une rune s'écrit par son numéro ou par son nom (ex. `air`, `brume`) ; `-` ou `0` = vide. Au prochain chargement d'une partie, chaque entrée est appliquée une seule fois, puis retirée de la config. Par sécurité, elle n'est appliquée que si :
+- la rune actuellement équipée du personnage est celle de l'emplacement 1 ;
+- ses emplacements 2 et 3 sont vides.
+
+La valeur par défaut reprend l'état relevé dans le log du premier test : héros Feu/Air, perso 17 Foudre/Brume, perso 23 Pie-grièche/Torrent. Après chaque chargement, le log liste tous les personnages qui portent une rune (`R161 personnages avec runes`), pour retrouver les numéros.
+
 ## Changements de la version 0.9.11-r160
 
 - **Lignes de runes qui fusionnent après B** (retour des sorts vers les runes) : la hauteur native de la fenêtre Runes n'est mémorisée qu'une fois, et non plus quand la fenêtre est déjà agrandie. La hauteur 3 lignes est ré-imposée à chaque image tant que le sélecteur est ouvert, car l'animation de reprise du focus la réduisait à une seule ligne.
