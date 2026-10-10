@@ -2482,6 +2482,59 @@ internal static class RuneBattleNativeEmblemFlow
 
 	private static int _cursorCorrections;
 
+	private static System.Reflection.PropertyInfo? _cursorOffProperty;
+
+	private static bool _cursorOffLookupDone;
+
+	private static UIWindowList? _cursorOffOwner;
+
+	private static bool _cursorOffOriginal;
+
+	// R167 : la fenetre Runes native est une fenetre d'affichage : m_isCursorOFFInFocus=True masque la barre
+	// de selection quand elle a le focus. Desactive tant que le selecteur 3 runes est ouvert.
+	private static void ShowSelectionBar(UIWindowList list)
+	{
+		try
+		{
+			if (!_cursorOffLookupDone)
+			{
+				_cursorOffLookupDone = true;
+				_cursorOffProperty = list.GetType().GetProperty("m_isCursorOFFInFocus", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public);
+			}
+			if (_cursorOffProperty == null || !(_cursorOffProperty.GetValue(list) is bool flag) || !flag)
+			{
+				return;
+			}
+			if (_cursorOffOwner == null)
+			{
+				_cursorOffOwner = list;
+				_cursorOffOriginal = flag;
+			}
+			_cursorOffProperty.SetValue(list, false);
+			SetNativeCursor(_selectedSlot);
+			Plugin.ModLog.LogInfo((object)"R167 barre de selection Runes affichee (m_isCursorOFFInFocus -> False).");
+		}
+		catch
+		{
+		}
+	}
+
+	private static void RestoreSelectionBar()
+	{
+		if (_cursorOffOwner == null)
+		{
+			return;
+		}
+		try
+		{
+			_cursorOffProperty?.SetValue(_cursorOffOwner, _cursorOffOriginal);
+		}
+		catch
+		{
+		}
+		_cursorOffOwner = null;
+	}
+
 	// R166 : apres B, la liste native gardait parfois son curseur visuel sur la ligne 2 (m_selectedIndex=1)
 	// alors que le curseur reel etait sur la ligne 1 (window_index=0) : le curseur affiche ne suivait plus
 	// Haut/Bas. Une fois l'ouverture terminee, le curseur visuel est aligne sur l'emplacement reel.
@@ -2596,6 +2649,7 @@ internal static class RuneBattleNativeEmblemFlow
 			float num2 = _originalContentsSize.y + _expandedHeightDelta;
 			Vector2 sizeDelta = geometryOwner.m_rectTransform.sizeDelta;
 			Vector2 sizeDelta2 = geometryOwner.m_contents.sizeDelta;
+			ShowSelectionBar(geometryOwner);
 			SyncVisualCursor(geometryOwner);
 			if (ResetListScroll(geometryOwner) && TryGetPlayer(_playerNo, out PLAYER_BASE scrollPlayer) && scrollPlayer != null)
 			{
@@ -2707,6 +2761,7 @@ internal static class RuneBattleNativeEmblemFlow
 
 	private static void RestoreEmblemGeometry()
 	{
+		RestoreSelectionBar();
 		//IL_0011: Unknown result type (might be due to invalid IL or missing references)
 		//IL_0021: Unknown result type (might be due to invalid IL or missing references)
 		UIWindowList geometryOwner = _geometryOwner;

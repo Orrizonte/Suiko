@@ -37,6 +37,10 @@ Le mod vérifie l'empreinte SHA-256 de `GameAssembly.dll`. Après une mise à jo
 - **Menu principal › Runes** : ←/→ change l'emplacement actif.
 - **Combat › Runes** : la fenêtre affiche les 3 emplacements ; A valide la rune et ouvre ses sorts, B revient aux commandes.
 
+## Changements de la version 0.9.18-r167
+
+- **Barre de sélection visible dans la fenêtre Runes en combat** : la fenêtre native est une fenêtre d'affichage dont le drapeau `m_isCursorOFFInFocus=True` masque la barre de sélection. Il est désactivé tant que le sélecteur 3 runes est ouvert, puis rétabli (ligne de log `R167`).
+
 ## Changements de la version 0.9.17-r166
 
 - **Curseur des runes figé après B** : le log montre qu'après un retour par B, la liste gardait parfois son curseur visuel sur la ligne 2 (`m_selectedIndex=1`) alors que le curseur réel était sur la ligne 1 (`wi=0`). Le curseur affiché ne suivait plus ↑/↓. Une fois la fenêtre ouverte, il est maintenant aligné à chaque image sur l'emplacement réel (ligne de log `R166 CURSEUR Runes aligne`).
