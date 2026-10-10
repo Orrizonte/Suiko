@@ -37,6 +37,11 @@ Le mod vérifie l'empreinte SHA-256 de `GameAssembly.dll`. Après une mise à jo
 - **Menu principal › Runes** : ←/→ change l'emplacement actif.
 - **Combat › Runes** : la fenêtre affiche les 3 emplacements ; A valide la rune et ouvre ses sorts, B revient aux commandes.
 
+## Changements de la version 0.9.15-r164
+
+- **Lignes fusionnées après B** : le log montre que le bug apparaît quand la fenêtre Runes s'ouvre avec le curseur ailleurs que sur la ligne 1. L'animation d'ouverture du jeu affiche alors la liste à partir de la ligne sélectionnée. Le sélecteur s'ouvre maintenant toujours sur le premier emplacement utilisable, y compris au retour par B.
+- **Tir (expérimental)** : avec son emplacement libre actif (`monsyo_id=0`, `exp=0`), le jeu refusait encore. La règle dépend donc du personnage (héros). Pendant les fonctions natives d'association, et seulement si le curseur est sur un porteur de rune fixe dont l'emplacement libre est actif, son numéro de personnage est remplacé le temps de l'appel par celui d'un autre membre de l'équipe, puis rétabli. Option `[Boutique] Associer_porteur_rune_fixe` (activée par défaut) ; ligne de log `R164 association`.
+
 ## Changements de la version 0.9.14-r163
 
 - **Tir (ou tout porteur d'une rune fixe) grisé dans « Sur qui voulez-vous équiper ceci ? »** : le log montre que le jeu refuse un personnage dont `monsyo_exp` est non nul ou dont la rune active est fixe. Pendant la boutique, `monsyo_exp` est remis à 0 pour toute l'équipe, et les porteurs d'une rune fixe active (Mangeuse d'âmes, Pie-grièche…) passent sur leur premier emplacement libre. La rune fixe reste en emplacement 1 et l'emplacement actif d'origine est rétabli à la fermeture de la boutique.

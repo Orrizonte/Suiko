@@ -1764,7 +1764,9 @@ internal static class RuneBattleNativeEmblemFlow
 			modLog2.LogInfo(val2);
 			MapNativeMagicWindowToEmblem(instance, val);
 			int unlockedSlotCount = RuneSlotService.GetUnlockedSlotCount(player);
-			_selectedSlot = FirstSelectableSlot(runeState, unlockedSlotCount, runeState.ActiveIndex);
+			// R164 : ouverture toujours sur le premier emplacement utilisable. Ouvrir la fenetre avec le curseur
+			// sur la ligne 2 faisait afficher la liste a partir de la ligne 2 (ligne 1 masquee, lignes fusionnees).
+			_selectedSlot = FirstSelectableSlot(runeState, unlockedSlotCount, 0);
 			BattleBase.WINDOW_WORK window_work = BattleBase.window_work;
 			if (window_work != null)
 			{
@@ -2208,7 +2210,9 @@ internal static class RuneBattleNativeEmblemFlow
 			BuildEmblemRows(player, emblem);
 			MapNativeMagicWindowToEmblem(instance, emblem);
 			int unlockedSlotCount = RuneSlotService.GetUnlockedSlotCount(player);
-			_selectedSlot = FirstSelectableSlot(runeState, unlockedSlotCount, runeState.ActiveIndex);
+			// R164 : ouverture toujours sur le premier emplacement utilisable. Ouvrir la fenetre avec le curseur
+			// sur la ligne 2 faisait afficher la liste a partir de la ligne 2 (ligne 1 masquee, lignes fusionnees).
+			_selectedSlot = FirstSelectableSlot(runeState, unlockedSlotCount, 0);
 			BattleBase.WINDOW_WORK window_work = BattleBase.window_work;
 			bool flag = default(bool);
 			BepInExInfoLogInterpolatedStringHandler val;

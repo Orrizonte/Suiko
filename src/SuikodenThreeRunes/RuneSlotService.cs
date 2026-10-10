@@ -772,6 +772,25 @@ public static class RuneSlotService
 		}
 	}
 
+	internal static bool IsShopFreedFixedHolder(PLAYER_BASE player)
+	{
+		if (!ShopMovedFromSlot.ContainsKey(player.chara_no) || player.monsyo_data == null)
+		{
+			return false;
+		}
+		return ValidateRuneId(player.monsyo_data.monsyo_id) == 0;
+	}
+
+	internal static bool HasFixedActiveRune(PLAYER_BASE player)
+	{
+		byte b = (byte)((player.monsyo_data != null) ? ValidateRuneId(player.monsyo_data.monsyo_id) : 0);
+		if (b != 1)
+		{
+			return IsNativeFixedRune(player.chara_no, b);
+		}
+		return true;
+	}
+
 	internal static void RestoreShopParty()
 	{
 		if (ShopMovedFromSlot.Count == 0)
