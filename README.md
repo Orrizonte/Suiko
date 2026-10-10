@@ -37,6 +37,11 @@ Le mod vérifie l'empreinte SHA-256 de `GameAssembly.dll`. Après une mise à jo
 - **Menu principal › Runes** : ←/→ change l'emplacement actif.
 - **Combat › Runes** : la fenêtre affiche les 3 emplacements ; A valide la rune et ouvre ses sorts, B revient aux commandes.
 
+## Changements de la version 0.9.22-r171
+
+- **Régression de la 0.9.21 après B** : en perdant le focus (passage aux sorts), la liste calcule sa position mémorisée `m_unFocusedCellY` à partir de la ligne sélectionnée : -21,75 pour la ligne 1, -75,27 pour la ligne 2 dans le log. Depuis que la ligne 2 est vraiment sélectionnée (barre R170), le retour par B repositionnait la liste avec un décalage d'une ligne. La valeur d'origine est maintenant verrouillée pendant le sélecteur et avant chaque réouverture (ligne de log `R171`).
+- La barre de sélection est bien présente dans les cellules Runes (log R170 : `True`).
+
 ## Changements de la version 0.9.21-r170
 
 - **Barre de sélection (4e essai, ciblé)** : le diagnostic R169 montre que chaque cellule de liste porte sa propre barre (`m_cursor : UISelectCursor`), activée par `SetSelect(bool)`, et que la liste offre `SetSelectOneCell(int)`. Le mod les appelle maintenant directement sur la fenêtre Runes, puis retire la barre (`ClearSelect`) en quittant le sélecteur. Ligne de log `R170`.

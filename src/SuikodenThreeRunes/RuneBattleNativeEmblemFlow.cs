@@ -1803,6 +1803,7 @@ internal static class RuneBattleNativeEmblemFlow
 			_geometryCorrections = 0;
 			_scrollCorrections = 0;
 			_cursorCorrections = 0;
+			_cellYCorrections = 0;
 			_listStateLogged = false;
 			_confirmArmed = !ProbeIsOn((GRInputManager.Type)4);
 			_selectorUpHeld = ProbeIsOn((GRInputManager.Type)0);
@@ -2266,6 +2267,7 @@ internal static class RuneBattleNativeEmblemFlow
 			_geometryCorrections = 0;
 			_scrollCorrections = 0;
 			_cursorCorrections = 0;
+			_cellYCorrections = 0;
 			_listStateLogged = false;
 			_selectorOpenedFromMagicBack = true;
 			_spellConfirmBlockedUntilRelease = false;
@@ -2276,6 +2278,7 @@ internal static class RuneBattleNativeEmblemFlow
 			_selectorLogged = false;
 			_selectorNeedsSettledRebuild = true;
 			EnsureThreeRowHeight(emblem);
+			LockUnfocusedCellY(emblem);
 			// R165 : curseur visuel natif aligne sur l'emplacement reel avant la reouverture.
 			emblem.SetSelectCell(_selectedSlot);
 			instance.OpenWindowUI((WindowType)8, true);
@@ -2646,6 +2649,52 @@ internal static class RuneBattleNativeEmblemFlow
 
 	private static bool _cellCursorLogged;
 
+	private static System.Reflection.PropertyInfo? _unfocusedCellYProperty;
+
+	private static bool _unfocusedCellYLookupDone;
+
+	private static readonly System.Collections.Generic.Dictionary<IntPtr, float> BaseUnfocusedCellY = new System.Collections.Generic.Dictionary<IntPtr, float>();
+
+	private static int _cellYCorrections;
+
+	// R171 : en quittant le focus (passage aux sorts), la liste calcule m_unFocusedCellY d'apres la ligne
+	// selectionnee (-21,75 pour la ligne 1, -75,27 pour la ligne 2). Depuis que la ligne 2 est vraiment
+	// selectionnee (barre R170), le retour par B repositionnait la liste avec ce decalage d'une ligne.
+	// La valeur d'origine est verrouillee tant que le selecteur est ouvert et avant chaque reouverture.
+	private static void LockUnfocusedCellY(UIWindowList list)
+	{
+		try
+		{
+			if (!_unfocusedCellYLookupDone)
+			{
+				_unfocusedCellYLookupDone = true;
+				_unfocusedCellYProperty = list.GetType().GetProperty("m_unFocusedCellY", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public);
+			}
+			if (_unfocusedCellYProperty == null || !_unfocusedCellYProperty.CanWrite || !(_unfocusedCellYProperty.GetValue(list) is float num))
+			{
+				return;
+			}
+			IntPtr pointer = ((Il2CppObjectBase)list).Pointer;
+			if (!BaseUnfocusedCellY.TryGetValue(pointer, out var value))
+			{
+				BaseUnfocusedCellY[pointer] = num;
+				return;
+			}
+			if (Math.Abs(num - value) >= 0.5f)
+			{
+				_unfocusedCellYProperty.SetValue(list, value);
+				if (_cellYCorrections < 5)
+				{
+					_cellYCorrections++;
+					Plugin.ModLog.LogInfo((object)$"R171 position liste Runes verrouillee : m_unFocusedCellY {num:0.##} -> {value:0.##}.");
+				}
+			}
+		}
+		catch
+		{
+		}
+	}
+
 	private static void InvokeOptional(object? target, string name, params object[] args)
 	{
 		if (target == null)
@@ -2782,6 +2831,7 @@ internal static class RuneBattleNativeEmblemFlow
 			float num2 = _originalContentsSize.y + _expandedHeightDelta;
 			Vector2 sizeDelta = geometryOwner.m_rectTransform.sizeDelta;
 			Vector2 sizeDelta2 = geometryOwner.m_contents.sizeDelta;
+			LockUnfocusedCellY(geometryOwner);
 			ShowSelectionBar(geometryOwner);
 			SyncVisualCursor(geometryOwner);
 			if (ResetListScroll(geometryOwner) && TryGetPlayer(_playerNo, out PLAYER_BASE scrollPlayer) && scrollPlayer != null)
