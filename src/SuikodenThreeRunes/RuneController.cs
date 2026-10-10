@@ -33,6 +33,17 @@ public sealed class RuneController : MonoBehaviour
 
 	private string _message = string.Empty;
 
+	private static string _notifyMessage = string.Empty;
+
+	private static float _notifyUntil;
+
+	// Bandeau d'information independant (diagnostics visibles en jeu).
+	internal static void Notify(string message, float seconds)
+	{
+		_notifyMessage = message;
+		_notifyUntil = Time.unscaledTime + seconds;
+	}
+
 	private bool _loggedReady;
 
 	private bool _controllerFaulted;
@@ -560,6 +571,11 @@ public sealed class RuneController : MonoBehaviour
 			if ((num || flag) && !string.IsNullOrEmpty(_shopSlots))
 			{
 				DrawShopPanel();
+			}
+			if (!(Time.unscaledTime > _notifyUntil) && !string.IsNullOrEmpty(_notifyMessage))
+			{
+				float num3 = Math.Min(900f, (float)Screen.width - 40f);
+				GUI.Box(new Rect(((float)Screen.width - num3) / 2f, 104f, num3, 52f), _notifyMessage);
 			}
 			if (Plugin.ShowOverlay.Value && !(Time.unscaledTime > _messageUntil) && !string.IsNullOrEmpty(_message))
 			{

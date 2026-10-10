@@ -11,5 +11,7 @@ namespace HarmonyLib
     [AttributeUsage(AttributeTargets.Method)] public class HarmonyPrefix : Attribute { }
     [AttributeUsage(AttributeTargets.Method)] public class HarmonyPostfix : Attribute { }
     [AttributeUsage(AttributeTargets.Method)] public class HarmonyFinalizer : Attribute { }
+    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method)] public class HarmonyBefore : Attribute { public HarmonyBefore(params string[] before) { } }
+    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method)] public class HarmonyAfter : Attribute { public HarmonyAfter(params string[] after) { } }
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method)] public class HarmonyPriority : Attribute { public HarmonyPriority(int priority) { } }
 }
