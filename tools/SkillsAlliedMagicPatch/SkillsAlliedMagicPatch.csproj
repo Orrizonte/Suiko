@@ -1,7 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- Patch binaire du mod "Suikoden I - Competences" (SuikodenSkills.dll 0.2.52, dont les sources ne sont pas
-       disponibles) : Magie / Resistance magique ne s'appliquent plus aux sorts entre allies (soins).
-       Usage : dotnet run -- SuikodenSkills.dll SuikodenSkills.patched.dll -->
+  <!-- Patch binaire du mod "Suikoden I - Competences" (SuikodenSkills.dll 0.2.52, sources non disponibles).
+       0.2.53 : Magie et Resistance magique ignorees entre allies (soins).
+       0.2.54 : verification visible de la Resistance magique (notification + log).
+       Usage : dotnet run (arguments : SuikodenSkills.dll d'origine, puis fichier de sortie) -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net8.0</TargetFramework>

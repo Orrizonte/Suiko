@@ -37,6 +37,13 @@ Le mod vérifie l'empreinte SHA-256 de `GameAssembly.dll`. Après une mise à jo
 - **Menu principal › Runes** : ←/→ change l'emplacement actif.
 - **Combat › Runes** : la fenêtre affiche les 3 emplacements ; A valide la rune et ouvre ses sorts, B revient aux commandes.
 
+## Mod Compétences (SuikodenSkills) – correctifs binaires
+
+Ce mod n'est livré qu'en DLL. Les correctifs sont appliqués directement à la DLL 0.2.52 par `tools/SkillsAlliedMagicPatch` ; la DLL corrigée est dans `release/BepInEx/plugins/SuikodenSkills/`.
+
+- **0.2.53** : Magie et Résistance magique ne s'appliquent plus aux sorts entre alliés (soins).
+- **0.2.54** : vérification visible de la Résistance magique. Quand un sort ennemi touche un personnage, le mod Compétences affiche (notification et log) : « Verification Resistance magique : Viktor recoit 120 -> 102 degats (Resistance magique 15%) ». Aucun message lors d'un sort ennemi signifie que le mod ne voit pas ce sort.
+
 ## Changements de la version 0.9.24-r173
 
 - **B depuis la liste des sorts ramène au menu de commandes**, par l'annulation native, comme B dans la fenêtre Runes. Le A automatique de la 0.9.23 est retiré. En rouvrant « Runes », le jeu affiche le sélecteur par son propre chemin, identique à la première fois. Ligne de log `R173`.
