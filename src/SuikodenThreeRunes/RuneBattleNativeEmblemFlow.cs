@@ -2426,6 +2426,15 @@ internal static class RuneBattleNativeEmblemFlow
 		{
 			val.SetSelectCell(slot);
 			instance.SetCursorUI((WindowType)8, slot);
+			// R169 : la barre de selection est un objet du gestionnaire de combat indexe par type de fenetre;
+			// la fenetre Runes est de type Emblem (5) et non Magic (8).
+			try
+			{
+				instance.SetCursorUI((WindowType)5, slot);
+			}
+			catch
+			{
+			}
 			UISummary summaryEmblem = instance.battleWindow.m_summaryEmblem;
 			if (summaryEmblem != null)
 			{
@@ -2517,6 +2526,7 @@ internal static class RuneBattleNativeEmblemFlow
 					{
 						Plugin.ModLog.LogInfo((object)("R168 cellule Runes : " + RuneSlotService.DescribeNative(list.cellList[0])));
 					}
+					Plugin.ModLog.LogInfo((object)("R169 membres curseur : UIBattleManager[" + DescribeCursorMembers(instance) + "] UIBattleMain[" + DescribeCursorMembers(instance?.battleWindow) + "] UIWindowList[" + DescribeCursorMembers(list) + "] Cellule[" + DescribeCursorMembers((list.cellList != null && list.cellList.Count > 0) ? list.cellList[0] : null) + "]"));
 				}
 				catch
 				{
@@ -2580,6 +2590,31 @@ internal static class RuneBattleNativeEmblemFlow
 		}
 		_cursorOffOwner = null;
 		_choosableOwner = null;
+	}
+
+	private static string DescribeCursorMembers(object? obj)
+	{
+		if (obj == null)
+		{
+			return "null";
+		}
+		System.Collections.Generic.List<string> list = new System.Collections.Generic.List<string>();
+		try
+		{
+			foreach (System.Reflection.MemberInfo member in obj.GetType().GetMembers(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public))
+			{
+				string text = member.Name.ToLowerInvariant();
+				if (text.Contains("cursor") || text.Contains("select") || text.Contains("focus") || text.Contains("highlight"))
+				{
+					string value = (member is System.Reflection.PropertyInfo propertyInfo) ? propertyInfo.PropertyType.Name : ((member is System.Reflection.MethodInfo methodInfo) ? ("(" + string.Join(",", Array.ConvertAll(methodInfo.GetParameters(), (System.Reflection.ParameterInfo p) => p.ParameterType.Name)) + ")") : member.MemberType.ToString());
+					list.Add(member.Name + ":" + value);
+				}
+			}
+		}
+		catch
+		{
+		}
+		return string.Join(" ", new System.Collections.Generic.HashSet<string>(list));
 	}
 
 	private static System.Reflection.PropertyInfo? _choosableProperty;
