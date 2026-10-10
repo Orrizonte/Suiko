@@ -716,6 +716,139 @@ public static class RuneSlotService
 		return false;
 	}
 
+	// ---- R163 : boutique ----
+	// Le jeu grise un personnage dans "Sur qui voulez-vous equiper ceci ?" si sa rune active est fixe
+	// (Mangeuse d'ames, Pie-grieche...) ou si monsyo_exp est non nul (etat compact du mod).
+	// Pendant la boutique : monsyo_exp=0 pour toute l'equipe, et les porteurs d'une rune fixe en
+	// emplacement actif passent sur leur premier emplacement libre debloque (l'emplacement 1 reste intact).
+	// A la fermeture, l'emplacement actif d'origine est restaure.
+	private static readonly Dictionary<int, int> ShopMovedFromSlot = new Dictionary<int, int>();
+
+	internal static void PrepareShopParty()
+	{
+		try
+		{
+			h_monsyo_c.MONSYO_WORK monsyo_work = h_monsyo_c.monsyo_work;
+			Il2CppReferenceArray<PLAYER_DATA> val = ((monsyo_work != null) ? monsyo_work.player_data : null);
+			if (val == null)
+			{
+				return;
+			}
+			for (int i = 0; i < ((Il2CppArrayBase<PLAYER_DATA>)(object)val).Length; i++)
+			{
+				PLAYER_DATA obj = ((Il2CppArrayBase<PLAYER_DATA>)(object)val)[i];
+				PLAYER_BASE val2 = ((obj != null) ? obj.player_base : null);
+				if (val2 == null || val2.monsyo_data == null)
+				{
+					continue;
+				}
+				RuneState state = GetState(val2);
+				byte b = ValidateRuneId(state.RuneIds[state.ActiveIndex]);
+				if (!ShopMovedFromSlot.ContainsKey(val2.chara_no) && b != 0 && (b == 1 || IsNativeFixedRune(val2.chara_no, b)))
+				{
+					int unlockedSlotCount = GetUnlockedSlotCount(val2);
+					for (int j = 0; j < unlockedSlotCount; j++)
+					{
+						if (j != state.ActiveIndex && state.RuneIds[j] == 0)
+						{
+							ShopMovedFromSlot[val2.chara_no] = state.ActiveIndex;
+							state.ActiveIndex = j;
+							WriteState(val2, state);
+							Plugin.ModLog.LogInfo((object)$"R163 boutique : personnage {val2.chara_no}, rune fixe {GetRuneName(b)} conservee en emplacement {ShopMovedFromSlot[val2.chara_no] + 1}; emplacement libre {j + 1} actif pour pouvoir associer.");
+							break;
+						}
+					}
+				}
+				byte b2 = ValidateRuneId(state.RuneIds[state.ActiveIndex]);
+				if (b2 != 1 && val2.monsyo_data.monsyo_exp != 0)
+				{
+					val2.monsyo_data.monsyo_exp = 0;
+				}
+			}
+		}
+		catch (Exception ex)
+		{
+			Plugin.ModLog.LogWarning((object)("R163 preparation de la boutique impossible : " + ex.Message));
+		}
+	}
+
+	internal static void RestoreShopParty()
+	{
+		if (ShopMovedFromSlot.Count == 0)
+		{
+			return;
+		}
+		try
+		{
+			GAME_WORK game_work = OldSrcBase.game_work;
+			Il2CppReferenceArray<PLAYER_BASE> val = ((game_work != null) ? game_work.player_base : null);
+			if (val != null)
+			{
+				for (int i = 0; i < ((Il2CppArrayBase<PLAYER_BASE>)(object)val).Length; i++)
+				{
+					PLAYER_BASE val2 = ((Il2CppArrayBase<PLAYER_BASE>)(object)val)[i];
+					if (val2 != null && val2.monsyo_data != null && ShopMovedFromSlot.TryGetValue(val2.chara_no, out var value))
+					{
+						RuneState state = GetState(val2);
+						if (value >= 0 && value < 3 && state.RuneIds[value] != 0)
+						{
+							state.ActiveIndex = value;
+							WriteState(val2, state);
+						}
+					}
+				}
+			}
+		}
+		catch (Exception ex)
+		{
+			Plugin.ModLog.LogWarning((object)("R163 restauration apres boutique impossible : " + ex.Message));
+		}
+		ShopMovedFromSlot.Clear();
+	}
+
+	// ---- R163 : combat ----
+	// Le choix fait hors combat (menu principal, boutique) n'a pas d'effet en combat : au premier ordre de
+	// chaque personnage dans un combat, l'emplacement actif repart sur l'emplacement 1 (ou le premier non vide).
+	private static readonly HashSet<int> BattleResetDone = new HashSet<int>();
+
+	private static int _lastBattleSetupFrame = -100000;
+
+	internal static void NoteBattleSetup()
+	{
+		int frameCount = UnityEngine.Time.frameCount;
+		if (frameCount - _lastBattleSetupFrame > 120)
+		{
+			BattleResetDone.Clear();
+		}
+		_lastBattleSetupFrame = frameCount;
+	}
+
+	internal static void ResetActiveForBattle(PLAYER_BASE player)
+	{
+		if (player == null || player.monsyo_data == null || !BattleResetDone.Add(player.chara_no))
+		{
+			return;
+		}
+		RuneState state = GetState(player);
+		int unlockedSlotCount = GetUnlockedSlotCount(player);
+		int num = -1;
+		for (int i = 0; i < unlockedSlotCount; i++)
+		{
+			if (state.RuneIds[i] != 0)
+			{
+				num = i;
+				break;
+			}
+		}
+		if (num >= 0 && num != state.ActiveIndex)
+		{
+			int activeIndex = state.ActiveIndex;
+			state.ActiveIndex = num;
+			WriteState(player, state);
+			Plugin.ModLog.LogInfo((object)$"R163 combat : personnage {player.chara_no} repart sur l'emplacement {num + 1} (choix hors combat {activeIndex + 1} ignore).");
+		}
+	}
+
 	internal static byte[] GetStoredRuneIds(PLAYER_BASE player)
 	{
 		RuneState state = GetState(player);

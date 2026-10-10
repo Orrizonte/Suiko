@@ -37,6 +37,12 @@ Le mod vérifie l'empreinte SHA-256 de `GameAssembly.dll`. Après une mise à jo
 - **Menu principal › Runes** : ←/→ change l'emplacement actif.
 - **Combat › Runes** : la fenêtre affiche les 3 emplacements ; A valide la rune et ouvre ses sorts, B revient aux commandes.
 
+## Changements de la version 0.9.14-r163
+
+- **Tir (ou tout porteur d'une rune fixe) grisé dans « Sur qui voulez-vous équiper ceci ? »** : le log montre que le jeu refuse un personnage dont `monsyo_exp` est non nul ou dont la rune active est fixe. Pendant la boutique, `monsyo_exp` est remis à 0 pour toute l'équipe, et les porteurs d'une rune fixe active (Mangeuse d'âmes, Pie-grièche…) passent sur leur premier emplacement libre. La rune fixe reste en emplacement 1 et l'emplacement actif d'origine est rétabli à la fermeture de la boutique.
+- **Le choix hors combat n'influence plus le combat** : au premier ordre de chaque personnage dans un combat, l'emplacement actif repart sur l'emplacement 1 (ou le premier non vide).
+- **Lignes fusionnées après B** : la liste native décalait ses données d'une ligne (« 2. » à la place de « 1. »). Ses index de défilement internes sont remis à 0 tant que le sélecteur est ouvert, puis les 3 lignes sont réécrites. Lignes de log `R163 liste Runes` / `R163 DEFILEMENT`.
+
 ## Changements de la version 0.9.13-r162
 
 - **Lignes fusionnées après B** : au retour par B avec le curseur sur l'emplacement 2 ou 3, la liste native défilait d'une ligne et la ligne 1 passait sous le titre. Le défilement est maintenant annulé tant que le sélecteur est ouvert ; le log affiche `R162 DEFILEMENT Runes annule` quand c'est le cas.

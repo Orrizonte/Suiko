@@ -211,6 +211,10 @@ internal static class RuneBattleNativeEmblemFlow
 
 	internal static void BeginCharacterCommand(int playerNo)
 	{
+		if (TryGetPlayer(playerNo, out PLAYER_BASE resetPlayer) && resetPlayer != null)
+		{
+			RuneSlotService.ResetActiveForBattle(resetPlayer);
+		}
 		//IL_0046: Unknown result type (might be due to invalid IL or missing references)
 		//IL_004c: Expected O, but got Unknown
 		if (_nativeRuneCancelPending && _nativeRuneCancelInjected)
@@ -1796,6 +1800,7 @@ internal static class RuneBattleNativeEmblemFlow
 			_stage = CombatStage.RuneSelector;
 			_geometryCorrections = 0;
 			_scrollCorrections = 0;
+			_listStateLogged = false;
 			_confirmArmed = !ProbeIsOn((GRInputManager.Type)4);
 			_selectorUpHeld = ProbeIsOn((GRInputManager.Type)0);
 			_selectorDownHeld = ProbeIsOn((GRInputManager.Type)1);
@@ -2252,6 +2257,7 @@ internal static class RuneBattleNativeEmblemFlow
 			_stage = CombatStage.RuneSelector;
 			_geometryCorrections = 0;
 			_scrollCorrections = 0;
+			_listStateLogged = false;
 			_selectorOpenedFromMagicBack = true;
 			_spellConfirmBlockedUntilRelease = false;
 			_confirmArmed = !ProbeIsOn((GRInputManager.Type)4);
@@ -2457,6 +2463,74 @@ internal static class RuneBattleNativeEmblemFlow
 
 	private static int _scrollCorrections;
 
+	private static bool _listStateLogged;
+
+	private static Il2CppStringArray BuildRowCell(int slot)
+	{
+		Il2CppStringArray val = new Il2CppStringArray(2L);
+		((Il2CppArrayBase<string>)(object)val)[0] = Labels[slot] ?? string.Empty;
+		((Il2CppArrayBase<string>)(object)val)[1] = string.Empty;
+		return val;
+	}
+
+	private static readonly string[] ScrollNameHints = new string[7] { "top", "scroll", "start", "offset", "head", "first", "page" };
+
+	private static System.Reflection.PropertyInfo[]? _scrollProperties;
+
+	// R163 : au retour par B avec le curseur sur l'emplacement 2, la liste native affiche les donnees a
+	// partir de la 2e entree (ligne 1 masquee, "2." a sa place). Les index de defilement internes de la
+	// liste sont remis a 0 tant que le selecteur est ouvert (3 lignes tiennent dans la fenetre agrandie).
+	private static bool ResetListScroll(UIWindowList list)
+	{
+		bool result = false;
+		try
+		{
+			if (_scrollProperties == null)
+			{
+				System.Collections.Generic.List<System.Reflection.PropertyInfo> list2 = new System.Collections.Generic.List<System.Reflection.PropertyInfo>();
+				foreach (System.Reflection.PropertyInfo property in list.GetType().GetProperties(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public))
+				{
+					string text = property.Name.ToLowerInvariant();
+					if (property.CanRead && property.CanWrite && property.GetIndexParameters().Length == 0 && property.PropertyType == typeof(int) && Array.Exists(ScrollNameHints, (string h) => text.Contains(h)))
+					{
+						list2.Add(property);
+					}
+				}
+				_scrollProperties = list2.ToArray();
+				Plugin.ModLog.LogInfo((object)("R163 liste Runes : champs de defilement surveilles = [" + string.Join(", ", Array.ConvertAll(_scrollProperties, (System.Reflection.PropertyInfo p) => p.Name)) + "]."));
+			}
+			if (!_listStateLogged)
+			{
+				_listStateLogged = true;
+				Plugin.ModLog.LogInfo((object)("R163 liste Runes etat : " + RuneSlotService.DescribeNative(list)));
+			}
+			System.Reflection.PropertyInfo[] scrollProperties = _scrollProperties;
+			foreach (System.Reflection.PropertyInfo propertyInfo in scrollProperties)
+			{
+				object value = propertyInfo.GetValue(list);
+				if (value is int num && num > 0)
+				{
+					propertyInfo.SetValue(list, 0);
+					result = true;
+					if (_scrollCorrections < 5)
+					{
+						_scrollCorrections++;
+						Plugin.ModLog.LogInfo((object)$"R163 DEFILEMENT liste Runes annule : {propertyInfo.Name}={value}->0.");
+					}
+				}
+			}
+		}
+		catch (Exception ex)
+		{
+			if (_scrollCorrections < 5)
+			{
+				_scrollCorrections = 5;
+				Plugin.ModLog.LogWarning((object)("R163 defilement liste Runes : " + ex.Message));
+			}
+		}
+		return result;
+	}
+
 	// R160 : appele a chaque image (LateUpdate, apres les animations du jeu). Quand la fenetre Runes reprend
 	// le focus (retour par B depuis les sorts), l'animation native lui redonne sa hauteur d'une seule rune et
 	// les 3 lignes se superposaient. On re-impose la hauteur 3 lignes tant que le selecteur est ouvert.
@@ -2473,6 +2547,14 @@ internal static class RuneBattleNativeEmblemFlow
 			float num2 = _originalContentsSize.y + _expandedHeightDelta;
 			Vector2 sizeDelta = geometryOwner.m_rectTransform.sizeDelta;
 			Vector2 sizeDelta2 = geometryOwner.m_contents.sizeDelta;
+			if (ResetListScroll(geometryOwner) && TryGetPlayer(_playerNo, out PLAYER_BASE scrollPlayer) && scrollPlayer != null)
+			{
+				BuildEmblemRows(scrollPlayer, geometryOwner, recreateCells: false);
+				for (int k = 0; k < 3; k++)
+				{
+					geometryOwner.SetCellText(k, BuildRowCell(k));
+				}
+			}
 			// R162 : au retour par B avec le curseur sur l'emplacement 2/3, la liste native defilait d'une
 			// ligne (elle croit n'afficher que 2 lignes) : la ligne 1 passait sous le titre et les lignes
 			// semblaient fusionnees. Les 3 lignes tiennent dans la fenetre agrandie : pas de defilement.

@@ -21,6 +21,8 @@ public sealed class RuneController : MonoBehaviour
 
 	private bool _shopTargetPhase;
 
+	private bool _shopWasVisible;
+
 	private int _shopTargetIndex = int.MinValue;
 
 	private bool _guiLogged;
@@ -138,6 +140,16 @@ public sealed class RuneController : MonoBehaviour
 				return;
 			}
 			bool flag3 = default(bool);
+			bool shopVisibleNow = RuneSlotService.IsRuneShopSelectionWindowVisible();
+			if (shopVisibleNow)
+			{
+				RuneSlotService.PrepareShopParty();
+			}
+			else if (_shopWasVisible)
+			{
+				RuneSlotService.RestoreShopParty();
+			}
+			_shopWasVisible = shopVisibleNow;
 			if (_shopCompatibilityPlayer != null && !RuneSlotService.IsRuneShopSelectionWindowVisible())
 			{
 				RuneSlotService.ExitRuneShopCompatibility(_shopCompatibilityPlayer);
