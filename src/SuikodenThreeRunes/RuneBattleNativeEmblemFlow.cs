@@ -199,6 +199,63 @@ internal static class RuneBattleNativeEmblemFlow
 		}
 	}
 
+	private static bool _autoReenterPending;
+
+	private static int _autoReenterPlayer = -1;
+
+	private static int _autoReenterStartFrame = -1000;
+
+	private static int _autoReenterInjectFrame = -1000;
+
+	// R172 : A injecte une seule fois, quand le menu de commandes est revenu avec le curseur sur "Runes".
+	private static bool TryAutoReenterDecide()
+	{
+		int frameCount = Time.frameCount;
+		if (frameCount == _autoReenterInjectFrame)
+		{
+			return true;
+		}
+		if (!_autoReenterPending)
+		{
+			return false;
+		}
+		if (frameCount - _autoReenterStartFrame > 300)
+		{
+			_autoReenterPending = false;
+			Plugin.ModLog.LogWarning((object)"R172 reouverture automatique de Runes abandonnee (menu de commandes non retrouve).");
+			return false;
+		}
+		if (_stage != CombatStage.Idle || _selectorBackReleaseGuard || _nativeRuneCancelPending || frameCount - _autoReenterStartFrame < 2)
+		{
+			return false;
+		}
+		try
+		{
+			BattleBase.WINDOW_WORK window_work = BattleBase.window_work;
+			UIBattleManager instance = Singleton<UIBattleManager>.Instance;
+			UIWindowList? command = instance?.battleWindow?.m_command;
+			if (window_work == null || instance == null || command == null || window_work.index_level != 0 || window_work.window_index != 2 || !instance.IsOpenWindowUI((WindowType)1) || ((UIWindowBasis)command).IsOpening)
+			{
+				return false;
+			}
+			if (_autoReenterPlayer >= 0 && _playerNo >= 0 && _autoReenterPlayer != _playerNo)
+			{
+				_autoReenterPending = false;
+				return false;
+			}
+			_autoReenterPending = false;
+			_autoReenterInjectFrame = frameCount;
+			CaptureNativeCommandStateBeforeRuneIfApplicable();
+			Plugin.ModLog.LogInfo((object)$"R172 A automatique sur Runes (frame {frameCount}).");
+			return true;
+		}
+		catch
+		{
+			_autoReenterPending = false;
+			return false;
+		}
+	}
+
 	private static bool IsPassiveRune(byte runeId)
 	{
 		return PassiveRuneIds.Contains(runeId);
@@ -606,6 +663,11 @@ internal static class RuneBattleNativeEmblemFlow
 		if (_probingNativeInput)
 		{
 			return false;
+		}
+		if ((int)input == 4 && TryAutoReenterDecide())
+		{
+			value = true;
+			return true;
 		}
 		if ((int)input == 5 && _nativeRuneCancelPending && _stage == CombatStage.RuneSelector && _commandDepth > 0)
 		{
@@ -2278,9 +2340,19 @@ internal static class RuneBattleNativeEmblemFlow
 			_selectorLogged = false;
 			_selectorNeedsSettledRebuild = true;
 			EnsureThreeRowHeight(emblem);
-			LockUnfocusedCellY(emblem);
-			// R165 : curseur visuel natif aligne sur l'emplacement reel avant la reouverture.
 			emblem.SetSelectCell(_selectedSlot);
+			if (!directNativeRune)
+			{
+				// R172 : au lieu de reconstruire le selecteur a la main (curseur different de la 1re ouverture),
+				// le retour par B passe par le chemin natif : annulation vers les commandes, puis A automatique
+				// sur "Runes". Le selecteur s'ouvre alors exactement comme la premiere fois.
+				_autoReenterPending = true;
+				_autoReenterPlayer = _playerNo;
+				_autoReenterStartFrame = Time.frameCount;
+				ArmNativeRuneSelectorCancel();
+				Plugin.ModLog.LogInfo((object)"R172 retour B : annulation native vers les commandes puis reouverture automatique de Runes (meme chemin que la 1re ouverture).");
+				return;
+			}
 			instance.OpenWindowUI((WindowType)8, true);
 			ManualLogSource modLog2 = Plugin.ModLog;
 			val = new BepInExInfoLogInterpolatedStringHandler(88, 4, out flag);
@@ -2429,42 +2501,6 @@ internal static class RuneBattleNativeEmblemFlow
 		{
 			val.SetSelectCell(slot);
 			instance.SetCursorUI((WindowType)8, slot);
-			// R170 : chaque cellule porte sa propre barre (m_cursor) activee par SetSelect(bool).
-			try
-			{
-				InvokeOptional(val, "SetSelectOneCell", slot);
-				Il2CppSystem.Collections.Generic.List<UIWindowListCell> cellList = val.cellList;
-				if (cellList != null)
-				{
-					for (int i = 0; i < cellList.Count && i < 3; i++)
-					{
-						InvokeOptional(cellList[i], "SetSelect", i == slot);
-					}
-					if (!_cellCursorLogged && cellList.Count > 0)
-					{
-						_cellCursorLogged = true;
-						object? cursor = cellList[0].GetType().GetProperty("m_cursor")?.GetValue(cellList[0]);
-						Plugin.ModLog.LogInfo((object)("R170 barre de selection : SetSelectOneCell/SetSelect appliques; barre presente dans les cellules Runes = " + (cursor != null) + "."));
-					}
-				}
-			}
-			catch (Exception ex)
-			{
-				if (!_cellCursorLogged)
-				{
-					_cellCursorLogged = true;
-					Plugin.ModLog.LogWarning((object)("R170 barre de selection impossible : " + ex.Message));
-				}
-			}
-			// R169 : la barre de selection est un objet du gestionnaire de combat indexe par type de fenetre;
-			// la fenetre Runes est de type Emblem (5) et non Magic (8).
-			try
-			{
-				instance.SetCursorUI((WindowType)5, slot);
-			}
-			catch
-			{
-			}
 			UISummary summaryEmblem = instance.battleWindow.m_summaryEmblem;
 			if (summaryEmblem != null)
 			{
@@ -2831,17 +2867,6 @@ internal static class RuneBattleNativeEmblemFlow
 			float num2 = _originalContentsSize.y + _expandedHeightDelta;
 			Vector2 sizeDelta = geometryOwner.m_rectTransform.sizeDelta;
 			Vector2 sizeDelta2 = geometryOwner.m_contents.sizeDelta;
-			LockUnfocusedCellY(geometryOwner);
-			ShowSelectionBar(geometryOwner);
-			SyncVisualCursor(geometryOwner);
-			if (ResetListScroll(geometryOwner) && TryGetPlayer(_playerNo, out PLAYER_BASE scrollPlayer) && scrollPlayer != null)
-			{
-				BuildEmblemRows(scrollPlayer, geometryOwner, recreateCells: false);
-				for (int k = 0; k < 3; k++)
-				{
-					geometryOwner.SetCellText(k, BuildRowCell(k));
-				}
-			}
 			// R162 : au retour par B avec le curseur sur l'emplacement 2/3, la liste native defilait d'une
 			// ligne (elle croit n'afficher que 2 lignes) : la ligne 1 passait sous le titre et les lignes
 			// semblaient fusionnees. Les 3 lignes tiennent dans la fenetre agrandie : pas de defilement.
