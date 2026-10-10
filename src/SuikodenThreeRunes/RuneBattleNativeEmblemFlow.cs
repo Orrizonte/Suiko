@@ -1802,6 +1802,7 @@ internal static class RuneBattleNativeEmblemFlow
 			_stage = CombatStage.RuneSelector;
 			_geometryCorrections = 0;
 			_scrollCorrections = 0;
+			_cursorCorrections = 0;
 			_listStateLogged = false;
 			_confirmArmed = !ProbeIsOn((GRInputManager.Type)4);
 			_selectorUpHeld = ProbeIsOn((GRInputManager.Type)0);
@@ -2264,6 +2265,7 @@ internal static class RuneBattleNativeEmblemFlow
 			_stage = CombatStage.RuneSelector;
 			_geometryCorrections = 0;
 			_scrollCorrections = 0;
+			_cursorCorrections = 0;
 			_listStateLogged = false;
 			_selectorOpenedFromMagicBack = true;
 			_spellConfirmBlockedUntilRelease = false;
@@ -2474,6 +2476,44 @@ internal static class RuneBattleNativeEmblemFlow
 
 	private static bool _listStateLogged;
 
+	private static System.Reflection.PropertyInfo? _selectedIndexProperty;
+
+	private static bool _selectedIndexLookupDone;
+
+	private static int _cursorCorrections;
+
+	// R166 : apres B, la liste native gardait parfois son curseur visuel sur la ligne 2 (m_selectedIndex=1)
+	// alors que le curseur reel etait sur la ligne 1 (window_index=0) : le curseur affiche ne suivait plus
+	// Haut/Bas. Une fois l'ouverture terminee, le curseur visuel est aligne sur l'emplacement reel.
+	private static void SyncVisualCursor(UIWindowList list)
+	{
+		try
+		{
+			if (((UIWindowBasis)list).IsOpening)
+			{
+				return;
+			}
+			if (!_selectedIndexLookupDone)
+			{
+				_selectedIndexLookupDone = true;
+				_selectedIndexProperty = list.GetType().GetProperty("m_selectedIndex", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public);
+			}
+			if (_selectedIndexProperty == null || !(_selectedIndexProperty.GetValue(list) is int num) || num == _selectedSlot || _selectedSlot < 0 || _selectedSlot > 2)
+			{
+				return;
+			}
+			SetNativeCursor(_selectedSlot);
+			if (_cursorCorrections < 5)
+			{
+				_cursorCorrections++;
+				Plugin.ModLog.LogInfo((object)$"R166 CURSEUR Runes aligne : visuel ligne {num + 1} -> ligne {_selectedSlot + 1}.");
+			}
+		}
+		catch
+		{
+		}
+	}
+
 	private static Il2CppStringArray BuildRowCell(int slot)
 	{
 		Il2CppStringArray val = new Il2CppStringArray(2L);
@@ -2556,6 +2596,7 @@ internal static class RuneBattleNativeEmblemFlow
 			float num2 = _originalContentsSize.y + _expandedHeightDelta;
 			Vector2 sizeDelta = geometryOwner.m_rectTransform.sizeDelta;
 			Vector2 sizeDelta2 = geometryOwner.m_contents.sizeDelta;
+			SyncVisualCursor(geometryOwner);
 			if (ResetListScroll(geometryOwner) && TryGetPlayer(_playerNo, out PLAYER_BASE scrollPlayer) && scrollPlayer != null)
 			{
 				BuildEmblemRows(scrollPlayer, geometryOwner, recreateCells: false);

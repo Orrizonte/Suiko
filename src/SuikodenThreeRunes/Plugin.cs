@@ -11,7 +11,7 @@ using HarmonyLib;
 
 namespace SuikodenThreeRunes;
 
-[BepInPlugin("fr.suikodenhd.threerunes", "Suikoden I - Trois runes selon la MAG", "0.9.16-r165")]
+[BepInPlugin("fr.suikodenhd.threerunes", "Suikoden I - Trois runes selon la MAG", "0.9.17-r166")]
 [BepInDependency("d3xMachina.suikoden_fix", BepInDependency.DependencyFlags.SoftDependency)]
 public sealed class Plugin : BasePlugin
 {
@@ -19,7 +19,7 @@ public sealed class Plugin : BasePlugin
 
 	public const string Name = "Suikoden I - Trois runes selon la MAG";
 
-	public const string Version = "0.9.16-r165";
+	public const string Version = "0.9.17-r166";
 
 	private const string SupportedGameAssemblySha256 = "e093f175eaf3734d293ca0a236c652dd7fcc72ea5fa10d7b21103edf12f11c3a";
 
@@ -75,7 +75,7 @@ public sealed class Plugin : BasePlugin
 			{
 				((BepInExLogInterpolatedStringHandler)val).AppendFormatted<string>("Suikoden I - Trois runes selon la MAG");
 				((BepInExLogInterpolatedStringHandler)val).AppendLiteral(" ");
-				((BepInExLogInterpolatedStringHandler)val).AppendFormatted<string>("0.9.16-r165");
+				((BepInExLogInterpolatedStringHandler)val).AppendFormatted<string>("0.9.17-r166");
 				((BepInExLogInterpolatedStringHandler)val).AppendLiteral(" charge. Seuils MAG: ");
 				((BepInExLogInterpolatedStringHandler)val).AppendFormatted<int>(SecondSlotMag.Value);
 				((BepInExLogInterpolatedStringHandler)val).AppendLiteral("/");
