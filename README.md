@@ -37,10 +37,6 @@ Le mod vérifie l'empreinte SHA-256 de `GameAssembly.dll`. Après une mise à jo
 - **Menu principal › Runes** : ←/→ change l'emplacement actif.
 - **Combat › Runes** : la fenêtre affiche les 3 emplacements ; A valide la rune et ouvre ses sorts, B revient aux commandes.
 
-## Changements de la version 0.9.25-r174
-
-- **Vérification en jeu de la Résistance magique** (mod Compétences). Pour chaque sort qui touche un personnage, un bandeau affiche : la cible, les dégâts calculés par le jeu, les dégâts finaux après le mod Compétences, le type de sort (ennemi ou allié) et le pourcentage de Résistance magique de la cible, avec « APPLIQUEE » ou « NON appliquee ». Lignes de log `R174`. Option `[Diagnostic] Verifier_resistance_magique` (activée par défaut).
-
 ## Changements de la version 0.9.24-r173
 
 - **B depuis la liste des sorts ramène au menu de commandes**, par l'annulation native, comme B dans la fenêtre Runes. Le A automatique de la 0.9.23 est retiré. En rouvrant « Runes », le jeu affiche le sélecteur par son propre chemin, identique à la première fois. Ligne de log `R173`.
